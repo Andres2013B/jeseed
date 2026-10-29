@@ -260,6 +260,33 @@
     } catch (e) { toast(e.message, 'error'); }
   }
 
+  /* Fotos de evidencia: se achican antes de subirlas (solo las ven los moderadores) */
+  const photos = { ownPhoto: null, verifyPhoto: null };
+
+  function shrinkImage(file, max = 1280) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      const url = URL.createObjectURL(file);
+      img.onload = () => {
+        const k = Math.min(1, max / Math.max(img.width, img.height));
+        const cv = document.createElement('canvas');
+        cv.width = Math.round(img.width * k); cv.height = Math.round(img.height * k);
+        cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
+        URL.revokeObjectURL(url);
+        cv.toBlob(b => b ? resolve(b) : reject(new Error('No se pudo leer la foto.')), 'image/jpeg', 0.8);
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('No se pudo leer la foto.')); };
+      img.src = url;
+    });
+  }
+
+  function photoField(id) {
+    return `<label class="lbl" for="${id}">Foto de evidencia <span class="optional">· opcional</span></label>
+      <p class="field-help">Solo la ven los moderadores. Procura no mostrar la cara de otras personas sin su permiso.</p>
+      <input type="file" id="${id}" accept="image/*">
+      <div id="${id}Preview"></div>`;
+  }
+
   /* Verificación: nadie suma puntos solo con dar clic */
   const sentToday = () => state.challenges.filter(c => (c.status === 'review' || c.status === 'completed')
     && c.completedAt && dayKey(c.completedAt) === dayKey(new Date())).length;
@@ -280,6 +307,7 @@
       return;
     }
     if (limitReached()) return;
+    photos.verifyPhoto = null;
     showDialog(`
       <div class="eyebrow">VERIFICACIÓN</div>
       <h2>${esc(row.title)}</h2>
@@ -287,6 +315,7 @@
       <form id="verifyForm" data-row="${esc(row.id)}" novalidate>
         <label class="lbl" for="verifyText">¿Qué hiciste, con quién y cuándo?</label>
         <textarea id="verifyText" maxlength="280" placeholder="Por ejemplo: hoy en el recreo ayudé a Daniel de 2°B a repasar fracciones para su examen."></textarea>
+        ${photoField('verifyPhoto')}
         <label class="check-label"><input type="checkbox" id="verifyHonest"> Prometo que de verdad hice esta acción. Sé que inventar acciones puede quitarme mis puntos.</label>
         <p class="form-error" id="verifyError" role="alert"></p>
         <div class="dialog-actions"><button class="primary dark" id="verifySubmit" type="submit">Enviar a verificación ✓</button><button type="button" class="text-btn" data-close="dialog">Cancelar</button></div>
@@ -318,7 +347,8 @@
     const points = base + (isDaily ? DAILY_BONUS : 0);
     $('#verifySubmit').disabled = true;
     try {
-      const upd = await Store.completeChallenge(state.user.id, row.id, { points, isDaily, evidence });
+      const upd = await Store.completeChallenge(state.user.id, row.id, { points, isDaily, evidence, photo: photos.verifyPhoto });
+      photos.verifyPhoto = null;
       Object.assign(row, upd);
       sentForReview(row, {});
       renderAll();
@@ -458,11 +488,7 @@
       <label class="lbl" for="ownDesc">Cuéntanos qué hiciste y cómo ayudó</label>
       <textarea id="ownDesc" maxlength="200" placeholder="Describe el gesto, el contexto y qué cambió. Evita incluir información privada de otras personas."></textarea>
       <span class="counter" id="ownCounter">0/200</span>
-      <label class="lbl" for="ownPhoto">Foto de evidencia <span class="optional">· opcional</span></label>
-      <p class="field-help">Puedes registrar tu acción sin foto. Si adjuntas una, procura no mostrar a otras personas sin su permiso.</p>
-      <input type="file" id="ownPhoto" accept="image/*">
-      <p class="field-help">Por ahora la foto solo se ve en tu pantalla; no se sube ni se guarda.</p>
-      <div id="ownPhotoPreview"></div>
+      ${photoField('ownPhoto')}
       <label class="check-label"><input type="checkbox" id="ownVoluntary"> Fue una acción voluntaria y no un castigo o una tarea impuesta.</label>
       <label class="check-label"><input type="checkbox" id="ownHonest"> Prometo que de verdad hice esta acción.</label>
       <label class="check-label"><input type="checkbox" id="ownShare" checked> Compartirla en la comunidad para inspirar a otros.</label>
@@ -726,6 +752,7 @@
           <div class="review-row">
             <strong>${esc(c.authorName || 'Miembro')}</strong><span class="status">+${c.points} PTS</span>${c.actionId === 'custom' ? '<span class="status">ACCIÓN PROPIA</span>' : ''}
             <p><b>${esc(c.title)}</b><br>${esc(c.evidence || 'Sin descripción')}</p>
+            ${c.photoUrl ? `<a href="${esc(c.photoUrl)}" target="_blank" rel="noopener"><img class="evidence-photo" src="${esc(c.photoUrl)}" alt="Foto de evidencia de ${esc(c.authorName || 'el alumno')}"></a>` : '<small>Sin foto</small><br>'}
             <small>${esc(catById(c.category)?.name || '')} · aceptado ${timeAgo(c.acceptedAt)} · enviado ${timeAgo(c.completedAt)}</small>
             ${same(c.userId, state.user.id)
               ? '<p class="field-help">Es tu propia acción: la tiene que aprobar otro moderador.</p>'
@@ -773,7 +800,8 @@
     const btn = $('#ownSubmit');
     btn.disabled = true;
     try {
-      const row = await Store.addCustom(state.user.id, { text: title, category, points: CUSTOM_POINTS, evidence: desc });
+      const row = await Store.addCustom(state.user.id, { text: title, category, points: CUSTOM_POINTS, evidence: desc, photo: photos.ownPhoto });
+      photos.ownPhoto = null;
       state.challenges.unshift(row);
       let shared = false;
       if (share) {
@@ -900,15 +928,18 @@
       if (e.target.id === 'searchInput') { state.q = e.target.value; renderExplore(); }
     });
 
-    document.addEventListener('change', (e) => {
-      if (e.target.id !== 'ownPhoto') return;
+    document.addEventListener('change', async (e) => {
+      const id = e.target.id;
+      if (!(id in photos)) return;
       const file = e.target.files && e.target.files[0];
-      const box = $('#ownPhotoPreview');
+      const box = $('#' + id + 'Preview');
+      photos[id] = null;
       if (!file) { box.innerHTML = ''; return; }
-      if (!file.type.startsWith('image/')) { toast('Elige una imagen.', 'error'); e.target.value = ''; return; }
-      const reader = new FileReader();
-      reader.onload = () => { box.innerHTML = `<img class="evidence-photo" src="${reader.result}" alt="Vista previa de tu foto">`; };
-      reader.readAsDataURL(file);
+      if (!file.type.startsWith('image/')) { toast('Elige una imagen.', 'error'); e.target.value = ''; box.innerHTML = ''; return; }
+      try {
+        photos[id] = await shrinkImage(file);
+        box.innerHTML = `<img class="evidence-photo" src="${URL.createObjectURL(photos[id])}" alt="Vista previa de tu foto">`;
+      } catch (err) { toast(err.message, 'error'); e.target.value = ''; box.innerHTML = ''; }
     });
 
     document.addEventListener('keydown', (e) => {

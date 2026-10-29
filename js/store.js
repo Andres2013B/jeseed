@@ -21,6 +21,9 @@ window.Store = (() => {
     const nowIso = () => new Date().toISOString();
     const pub = u => ({ id: u.id, name: u.name, email: u.email, isAdmin: !!u.isAdmin });
     const same = (a, b) => String(a) === String(b);
+    const toDataUrl = blob => !blob ? Promise.resolve(null) : new Promise(res => {
+      const r = new FileReader(); r.onload = () => res(r.result); r.onerror = () => res(null); r.readAsDataURL(blob);
+    });
 
     async function hash(text) {
       try {
@@ -108,19 +111,21 @@ window.Store = (() => {
         write(K.ch, all);
         return row;
       },
-      async completeChallenge(userId, rowId, { points, isDaily, evidence }) {
+      async completeChallenge(userId, rowId, { points, isDaily, evidence, photo }) {
+        const photoData = await toDataUrl(photo);
         const all = read(K.ch, []);
         const row = all.find(c => same(c.id, rowId) && same(c.userId, userId));
         if (!row) throw new Error('No encontramos ese reto.');
         if (row.status !== 'accepted') throw new Error('Este reto ya fue enviado.');
-        Object.assign(row, { status: 'review', points, isDaily, evidence, completedAt: nowIso() });
+        Object.assign(row, { status: 'review', points, isDaily, evidence, photo: photoData, completedAt: nowIso() });
         write(K.ch, all);
         return { ...row };
       },
-      async addCustom(userId, { text, category, points, evidence }) {
+      async addCustom(userId, { text, category, points, evidence, photo }) {
+        const photoData = await toDataUrl(photo);
         const all = read(K.ch, []);
         const row = {
-          id: uid(), userId, actionId: 'custom', category, title: text, points, evidence,
+          id: uid(), userId, actionId: 'custom', category, title: text, points, evidence, photo: photoData,
           isDaily: false, status: 'review', acceptedAt: nowIso(), completedAt: nowIso()
         };
         all.push(row);
@@ -135,7 +140,7 @@ window.Store = (() => {
         const users = read(K.users, []);
         return read(K.ch, []).filter(c => c.status === 'review')
           .sort((a, b) => new Date(a.completedAt) - new Date(b.completedAt))
-          .map(c => ({ ...c, authorName: users.find(u => same(u.id, c.userId))?.name || 'Miembro' }));
+          .map(c => ({ ...c, photoUrl: c.photo || null, authorName: users.find(u => same(u.id, c.userId))?.name || 'Miembro' }));
       },
       async verifyChallenge(rowId, approve) {
         const all = read(K.ch, []);
@@ -246,8 +251,16 @@ window.Store = (() => {
     const mapCh = r => ({
       id: r.id, userId: r.user_id, actionId: r.action_id, category: r.category, title: r.title, points: r.points,
       isDaily: r.is_daily, status: r.status, acceptedAt: r.accepted_at, completedAt: r.completed_at,
-      evidence: r.evidence
+      evidence: r.evidence, photoPath: r.photo_path
     });
+
+    async function uploadPhoto(userId, blob) {
+      if (!blob) return null;
+      const path = `${userId}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.jpg`;
+      const { error } = await sb.storage.from('evidencias').upload(path, blob, { contentType: 'image/jpeg' });
+      if (error) throw new Error('No se pudo subir la foto. Inténtalo de nuevo o envía sin foto.');
+      return path;
+    }
     const mapPost = (r, liked = new Set(), reported = new Set()) => ({
       id: r.id, userId: r.user_id, authorName: r.author_name, content: r.content, category: r.category,
       status: r.status, createdAt: r.created_at,
@@ -299,20 +312,22 @@ window.Store = (() => {
         fail(error);
         return mapCh(data);
       },
-      async completeChallenge(userId, rowId, { points, isDaily, evidence }) {
+      async completeChallenge(userId, rowId, { points, isDaily, evidence, photo }) {
+        const photo_path = await uploadPhoto(userId, photo);
         const { data, error } = await sb.from('user_challenges')
-          .update({ status: 'review', points, is_daily: isDaily, evidence })
+          .update({ status: 'review', points, is_daily: isDaily, evidence, photo_path })
           .eq('id', rowId).eq('status', 'accepted').select().single();
         fail(error);
         return mapCh(data);
       },
-      async addCustom(userId, { text, category, points, evidence }) {
+      async addCustom(userId, { text, category, points, evidence, photo }) {
+        const photo_path = await uploadPhoto(userId, photo);
         const ins = await sb.from('user_challenges')
           .insert({ action_id: 'custom', category, title: text, points })
           .select('id').single();
         fail(ins.error);
         const { data, error } = await sb.from('user_challenges')
-          .update({ status: 'review', points, evidence })
+          .update({ status: 'review', points, evidence, photo_path })
           .eq('id', ins.data.id).select().single();
         fail(error);
         return mapCh(data);
@@ -333,7 +348,13 @@ window.Store = (() => {
           fail(res.error);
           res.data.forEach(p => { names[p.id] = p.display_name; });
         }
-        return data.map(r => ({ ...mapCh(r), authorName: names[r.user_id] }));
+        const paths = data.map(r => r.photo_path).filter(Boolean);
+        const urls = {};
+        if (paths.length) {
+          const res = await sb.storage.from('evidencias').createSignedUrls(paths, 3600);
+          (res.data || []).forEach(x => { if (x.signedUrl) urls[x.path] = x.signedUrl; });
+        }
+        return data.map(r => ({ ...mapCh(r), authorName: names[r.user_id], photoUrl: urls[r.photo_path] || null }));
       },
       async verifyChallenge(rowId, approve) {
         const { error } = await sb.from('user_challenges')

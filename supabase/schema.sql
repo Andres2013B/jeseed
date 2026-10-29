@@ -87,6 +87,7 @@ create table if not exists public.user_challenges (
   verified_at timestamptz,
   verified_by uuid references auth.users (id)
 );
+alter table public.user_challenges add column if not exists photo_path text;
 create unique index if not exists user_challenges_one_active
   on public.user_challenges (user_id, action_id) where status = 'accepted' and action_id <> 'custom';
 create index if not exists user_challenges_review on public.user_challenges (status, completed_at);
@@ -117,6 +118,7 @@ begin
   new.verified_by := null;
   new.is_daily := false;
   new.evidence := null;
+  new.photo_path := null;
   new.points := case when new.action_id = 'custom' then 10 else least(greatest(new.points, 0), 20) end;
   return new;
 end $$;
@@ -133,6 +135,7 @@ declare
   sent_today int;
   is_daily boolean := coalesce(new.is_daily, false);
   evidence text := trim(coalesce(new.evidence, ''));
+  photo text := new.photo_path;
 begin
   -- 0) Cambios hechos directo desde el panel de Supabase (no desde la página)
   if auth.uid() is null then
@@ -171,6 +174,7 @@ begin
     new := old;                       -- solo se aceptan estos cambios
     new.status := 'review';
     new.evidence := evidence;
+    new.photo_path := case when photo like auth.uid()::text || '/%' then photo end;
     new.completed_at := now();
     new.is_daily := is_daily and old.action_id <> 'custom';
     new.points := case when old.action_id = 'custom' then 10
@@ -184,6 +188,19 @@ end $$;
 drop trigger if exists challenge_before_update on public.user_challenges;
 create trigger challenge_before_update before update on public.user_challenges
   for each row execute function public.challenge_before_update();
+
+-- ---------------------------------------------------------- Fotos de evidencia (privadas)
+-- Cada alumno sube a su propia carpeta; solo él y los moderadores pueden verlas.
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values ('evidencias', 'evidencias', false, 5242880, array['image/jpeg', 'image/png', 'image/webp'])
+on conflict (id) do nothing;
+
+drop policy if exists "evidencias: subir" on storage.objects;
+create policy "evidencias: subir" on storage.objects for insert to authenticated
+  with check (bucket_id = 'evidencias' and (storage.foldername(name))[1] = auth.uid()::text);
+drop policy if exists "evidencias: ver" on storage.objects;
+create policy "evidencias: ver" on storage.objects for select to authenticated
+  using (bucket_id = 'evidencias' and ((storage.foldername(name))[1] = auth.uid()::text or public.is_moderator()));
 
 -- ---------------------------------------------------------- Comunidad
 create table if not exists public.posts (
