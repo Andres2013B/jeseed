@@ -266,6 +266,7 @@
     catch (e) { state.posts = []; }
     try { state.leaders = await Store.leaderboard(); }
     catch (e) { state.leaders = []; }
+    refreshGalleryIfChanged();
   }
 
   /* ---------------------------------------------------------- Retos */
@@ -515,6 +516,7 @@
       <label class="check-label"><input type="checkbox" id="ownHonest"> Prometo que de verdad hice esta acción.</label>
       <label class="check-label"><input type="checkbox" id="ownShare" checked> Compartirla en la comunidad para inspirar a otros.</label>
       <label class="check-label"><input type="checkbox" id="ownAnon"> Publicar sin mi nombre (aparece como “Anónimo”).</label>
+      <label class="check-label"><input type="checkbox" id="ownSharePhoto" checked> Si compartes, mostrar también la foto en la comunidad y en la galería (después de revisión).</label>
       <div class="notice">Un responsable de Olami ORT la verifica antes de sumar los puntos. Si la compartes, pasa por revisión antes de publicarse. Repetir una publicación no multiplica los puntos.</div>
       <button class="primary" id="ownSubmit" type="submit">Registrar mi acción <span>↗</span></button>
       ${locked ? `<div class="locked-cover"><span>🔒 Entra con tu cuenta para registrar tu acción</span><button type="button" class="primary dark" data-act="login">Acceso Olami ORT ↗</button></div>` : ''}
@@ -570,6 +572,7 @@
         ${!approved ? `<span class="status ${p.status}">${p.status === 'pending' ? 'EN REVISIÓN' : 'NO APROBADA'}</span>` : ''}
       </div>
       <p>${esc(p.content)}</p>
+      ${p.photoUrl ? `<img class="post-photo" src="${esc(p.photoUrl)}" alt="Foto de la buena acción" loading="lazy">` : ''}
       <div class="post-actions">
         <button class="like ${p.likedByMe ? 'liked' : ''}" data-act="like" data-post="${esc(p.id)}" ${approved ? '' : 'disabled'}>♡ Me inspira · ${p.likes}</button>
         ${approved ? `<button class="like ${open ? 'on' : ''}" data-act="comments" data-post="${esc(p.id)}">💬 ${p.comments || 0}</button>
@@ -856,6 +859,7 @@
           <div class="review-row">
             <strong>${esc(p.authorName)}</strong><span class="status">EN REVISIÓN</span>${p.reports ? `<span class="status rejected">${plural(p.reports, 'reporte', 'reportes')}</span>` : ''}
             <p>${esc(p.content)}</p>
+            ${p.photoUrl ? `<img class="evidence-photo" src="${esc(p.photoUrl)}" alt="Foto que se publicará"><p class="field-help">📸 Si apruebas, esta foto se ve en la comunidad y en la galería. Revisa que nadie salga sin permiso.</p>` : ''}
             <small>${esc(catById(p.category)?.name || '')} · ${timeAgo(p.createdAt)}</small>
             <div class="review-controls">
               <button class="accept go" data-act="approve" data-post="${esc(p.id)}">Aprobar</button>
@@ -865,7 +869,7 @@
           </div>`).join('') : '<p class="empty-line">Todo al día. ¡Gracias por cuidar la comunidad!</p>'}
       </section>
       <section class="review-box">
-        <div class="section-head"><div><h2>Galería “Jesed en acción” · ${state.gallery.length}</h2><p>Fotos de servicio social y actividades (Eishel, DAR…). Aparecen en “Mi día” para todos.</p></div></div>
+        <div class="section-head"><div><h2>Fotos extra para la galería · ${state.gallery.length}</h2><p>La galería de “Mi día” se llena sola con las fotos de las publicaciones que apruebas. Aquí puedes agregar fotos de actividades del colegio (Eishel, DAR…).</p></div></div>
         <form id="galleryForm" class="gallery-form" novalidate>
           ${photoField('galleryPhoto').replace('Foto de evidencia', 'Foto').replace('Solo la ven los moderadores. ', '')}
           <label class="lbl" for="galleryTitle">Programa o actividad</label>
@@ -906,12 +910,19 @@
     const btn = $('#ownSubmit');
     btn.disabled = true;
     try {
-      const row = await Store.addCustom(state.user.id, { text: title, category, points: CUSTOM_POINTS, evidence: desc, photo: photos.ownPhoto });
+      const photo = photos.ownPhoto;
+      const row = await Store.addCustom(state.user.id, { text: title, category, points: CUSTOM_POINTS, evidence: desc, photo });
       photos.ownPhoto = null;
       state.challenges.unshift(row);
       let shared = false;
       if (share) {
-        try { await Store.createPost(state.user, { content: `${title} — ${desc}`, category, anonymous: $('#ownAnon').checked }); shared = true; }
+        try {
+          await Store.createPost(state.user, {
+            content: `${title} — ${desc}`, category, anonymous: $('#ownAnon').checked,
+            photo: $('#ownSharePhoto').checked ? photo : null
+          });
+          shared = true;
+        }
         catch (err) { toast(`Tu acción se guardó, pero no se pudo compartir: ${err.message}`, 'error'); }
       }
       $('#ownForm').reset();
@@ -1129,15 +1140,34 @@
     renderGallery();
   }
 
+  // Fotos de la galería: las que suben los moderadores + las de publicaciones aprobadas
+  function galleryItems() {
+    const fromPosts = state.posts
+      .filter(p => p.status === 'approved' && p.photoUrl)
+      .map(p => {
+        const text = String(p.content || '');
+        return { id: 'p' + p.id, url: p.photoUrl, title: p.authorName, caption: text.length > 90 ? text.slice(0, 88) + '…' : text, at: p.createdAt };
+      });
+    const curated = state.gallery.map(g => ({ ...g, at: g.createdAt }));
+    return [...curated, ...fromPosts].sort((a, b) => new Date(b.at) - new Date(a.at)).slice(0, 24);
+  }
+
+  let galleryKey = '';
+  function refreshGalleryIfChanged() {
+    const key = galleryItems().map(g => g.id).join(',') + '|' + (state.user?.id || '');
+    if (key !== galleryKey) renderGallery();
+  }
+
   function renderGallery() {
     const box = $('#gallery');
-    const list = state.gallery;
+    const list = galleryItems();
+    galleryKey = list.map(g => g.id).join(',') + '|' + (state.user?.id || '');
     clearInterval(galleryTimer);
     if (!list.length) {
-      box.hidden = !state.user?.isAdmin;
-      box.innerHTML = state.user?.isAdmin
-        ? '<div class="gallery-empty"><strong>📸 Galería “Jesed en acción”</strong><p>Agrega fotos de servicio social desde Moderación y aparecerán aquí para todos.</p><a class="text-btn" href="#admin">Ir a Moderación ↗</a></div>'
-        : '';
+      box.hidden = false;
+      box.innerHTML = `<div class="gallery-empty"><div class="eyebrow">JESED EN ACCIÓN</div><strong>📸 Aquí aparecerán las fotos de la comunidad</strong>
+        <p>Comparte tu buena acción con una foto: cuando un responsable la apruebe, se verá en esta galería.</p>
+        <button class="primary" data-act="go-form">Compartir con foto <span>↗</span></button></div>`;
       return;
     }
     box.hidden = false;
@@ -1145,7 +1175,7 @@
     const cur = list[state.galleryIndex];
     box.innerHTML = `
       <div class="gallery-head">
-        <div><div class="eyebrow">JESED EN ACCIÓN · SERVICIO SOCIAL</div><h2>${esc(cur.title)}</h2><p>${esc(cur.caption || '')}</p></div>
+        <div><div class="eyebrow">JESED EN ACCIÓN · FOTOS DE LA COMUNIDAD</div><h2>${esc(cur.title)}</h2><p>${esc(cur.caption || '')}</p></div>
         <div class="gallery-ctrl">
           <button data-act="gallery-prev" aria-label="Foto anterior">‹</button>
           <button data-act="gallery-pause" aria-label="${state.galleryPaused ? 'Reproducir' : 'Pausar'}">${state.galleryPaused ? '▶' : 'Ⅱ'}</button>
@@ -1166,7 +1196,7 @@
   }
 
   function galleryGo(i) {
-    const n = state.gallery.length;
+    const n = galleryItems().length;
     if (!n) return;
     state.galleryIndex = (i + n) % n;
     renderGallery();

@@ -10,11 +10,12 @@ Página de buenas acciones (Jesed) para alumnos del Colegio Olami ORT.
 - Secciones (Kinder, Primaria, Secundaria, Prepa) y filtro en Comunidad.
 - Publicar sin nombre, comentarios, guardar publicaciones.
 - Meta semanal, avisos (🔔), menú "Más" (compartir y enviar opinión).
-- Galería "Jesed en acción": la llenan los moderadores desde Moderación.
+- Galería "Jesed en acción": se llena con las fotos de las publicaciones aprobadas (y fotos extra de los moderadores).
 
 ## Base de datos (Supabase → SQL Editor, en orden)
 1. `supabase/schema.sql`
 2. `supabase/02-comunidad.sql`
+3. `supabase/03-fotos.sql`
 
 ## Publicar
 Settings → Pages → Source: *Deploy from a branch* → Branch: `main` / `(root)` → Save.

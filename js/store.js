@@ -60,7 +60,8 @@ window.Store = (() => {
         likedByMe: !!userId && likes.some(l => same(l.postId, p.id) && same(l.userId, userId)),
         reportedByMe: !!userId && reports.some(r => same(r.postId, p.id) && same(r.userId, userId)),
         reports: reports.filter(r => same(r.postId, p.id)).length,
-        comments: read(K.comments, []).filter(c => same(c.postId, p.id)).length
+        comments: read(K.comments, []).filter(c => same(c.postId, p.id)).length,
+        photoUrl: p.photo || null
       };
     }
 
@@ -165,9 +166,10 @@ window.Store = (() => {
           .slice(0, 50)
           .map(p => decoratePost(p, userId));
       },
-      async createPost(user, { content, category, anonymous }) {
+      async createPost(user, { content, category, anonymous, photo }) {
         const check = Moderation.check(content);
         if (!check.ok) throw new Error(check.reason);
+        const photoData = await toDataUrl(photo);
         const posts = read(K.posts, []);
         const hourAgo = Date.now() - 3600e3;
         if (posts.filter(p => same(p.userId, user.id) && new Date(p.createdAt) > hourAgo).length >= 5) {
@@ -175,7 +177,7 @@ window.Store = (() => {
         }
         posts.push({
           id: uid(), userId: user.id, authorName: anonymous ? 'Anónimo' : user.name, anonymous: !!anonymous, section: user.section || null,
-          content: content.trim(), category: category || null, status: 'pending', createdAt: nowIso()
+          content: content.trim(), category: category || null, photo: photoData, status: 'pending', createdAt: nowIso()
         });
         write(K.posts, posts);
       },
@@ -304,17 +306,28 @@ window.Store = (() => {
       evidence: r.evidence, photoPath: r.photo_path
     });
 
-    async function uploadPhoto(userId, blob) {
+    async function uploadPhoto(userId, blob, bucket = 'evidencias') {
       if (!blob) return null;
       const path = `${userId}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.jpg`;
-      const { error } = await sb.storage.from('evidencias').upload(path, blob, { contentType: 'image/jpeg' });
+      const { error } = await sb.storage.from(bucket).upload(path, blob, { contentType: 'image/jpeg' });
       if (error) throw new Error('No se pudo subir la foto. Inténtalo de nuevo o envía sin foto.');
       return path;
+    }
+
+    // Las fotos de publicaciones son privadas hasta que se aprueban; se leen con links temporales.
+    async function withPostPhotos(rows) {
+      const paths = rows.map(r => r.photo_path).filter(Boolean);
+      if (!paths.length) return rows;
+      const { data } = await sb.storage.from('publicaciones').createSignedUrls(paths, 3600);
+      const urls = {};
+      (data || []).forEach(x => { if (x.signedUrl) urls[x.path] = x.signedUrl; });
+      return rows.map(r => ({ ...r, photoUrl: urls[r.photo_path] || null }));
     }
     const mapPost = (r, liked = new Set(), reported = new Set()) => ({
       id: r.id, userId: r.user_id, authorName: r.author_name, content: r.content, category: r.category,
       status: r.status, createdAt: r.created_at, section: r.section, anonymous: r.anonymous,
       comments: r.post_comments?.[0]?.count ?? 0,
+      photoUrl: r.photoUrl || null,
       likes: r.post_likes?.[0]?.count ?? 0,
       reports: r.post_reports?.[0]?.count ?? 0,
       likedByMe: liked.has(String(r.id)),
@@ -421,7 +434,7 @@ window.Store = (() => {
 
       async listPosts(userId) {
         const { data, error } = await sb.from('posts')
-          .select('id,user_id,author_name,content,category,status,created_at,section,anonymous,post_likes(count),post_comments(count)')
+          .select('id,user_id,author_name,content,category,status,created_at,section,anonymous,photo_path,post_likes(count),post_comments(count)')
           .order('created_at', { ascending: false }).limit(50);
         fail(error);
         let liked = new Set(), reported = new Set();
@@ -434,12 +447,12 @@ window.Store = (() => {
           reported = new Set((r.data || []).map(x => String(x.post_id)));
         }
         // Los admins pueden leer pendientes; en el feed solo mostramos aprobadas + las propias.
-        return data
-          .filter(p => p.status === 'approved' || (userId && p.user_id === userId))
-          .map(p => mapPost(p, liked, reported));
+        const visible = data.filter(p => p.status === 'approved' || (userId && p.user_id === userId));
+        return (await withPostPhotos(visible)).map(p => mapPost(p, liked, reported));
       },
-      async createPost(user, { content, category, anonymous }) {
-        const { error } = await sb.from('posts').insert({ content: content.trim(), category: category || null, author_name: user.name, anonymous: !!anonymous });
+      async createPost(user, { content, category, anonymous, photo }) {
+        const photo_path = await uploadPhoto(user.id, photo, 'publicaciones');
+        const { error } = await sb.from('posts').insert({ content: content.trim(), category: category || null, author_name: user.name, anonymous: !!anonymous, photo_path });
         fail(error);
       },
       async toggleLike(userId, postId, liked) {
@@ -460,10 +473,10 @@ window.Store = (() => {
 
       async listPending() {
         const { data, error } = await sb.from('posts')
-          .select('id,user_id,author_name,content,category,status,created_at,post_reports(count)')
+          .select('id,user_id,author_name,content,category,status,created_at,section,anonymous,photo_path,post_reports(count)')
           .eq('status', 'pending').order('created_at', { ascending: true });
         fail(error);
-        return data.map(p => mapPost(p));
+        return (await withPostPhotos(data)).map(p => mapPost(p));
       },
       async setPostStatus(postId, status) {
         const { error } = await sb.from('posts').update({ status }).eq('id', postId);
