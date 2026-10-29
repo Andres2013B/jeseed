@@ -191,7 +191,7 @@
   function setAuthMode(mode) {
     state.authMode = mode;
     const reg = mode === 'register';
-    $('#authTitle').textContent = reg ? 'Únete a JESSED' : 'Qué gusto verte de nuevo';
+    $('#authTitle').textContent = reg ? 'Únete a Maayan Jessed' : 'Qué gusto verte de nuevo';
     $('#authSubtitle').textContent = reg ? 'Crea tu cuenta para guardar tus retos, puntos e insignias.' : 'Entra para seguir sumando buenas acciones.';
     $('#nameField').hidden = !reg;
     $('#sectionField').hidden = !reg;
@@ -238,7 +238,7 @@
       state.user = res.user;
       await loadUserData();
       closeModal('authModal');
-      toast(reg ? `¡Bienvenido a JESSED, ${firstName(state.user.name)}! 💜` : `¡Hola de nuevo, ${firstName(state.user.name)}!`);
+      toast(reg ? `¡Bienvenido a Maayan Jessed, ${firstName(state.user.name)}! 💜` : `¡Hola de nuevo, ${firstName(state.user.name)}!`);
       await refreshPosts();
       renderAll();
       renderGallery();
@@ -559,7 +559,7 @@
       </div>
       <div class="diploma-mini">
         <span>✧</span>
-        <small>OLAMI ORT · JESED</small>
+        <small>OLAMI ORT · MAAYAN JESSED</small>
         <strong>Alumno del mes</strong>
         <p>${top ? esc(top.name) : 'Buenas acciones'}</p>
         <small>${top ? `${top.points} PUNTOS ESTA SEMANA` : 'EJEMPLO DE DIPLOMA'}</small>
@@ -1156,7 +1156,7 @@
   async function shareApp() {
     toggleMore(false);
     const url = location.origin + location.pathname;
-    const data = { title: 'JESSED · Olami ORT', text: 'Únete a JESSED: pequeñas acciones, grandes cambios.', url };
+    const data = { title: 'Maayan Jessed · Olami ORT', text: 'Únete a Maayan Jessed: pequeñas acciones, grandes cambios.', url };
     try {
       if (navigator.share) { await navigator.share(data); return; }
       await navigator.clipboard.writeText(url);
@@ -1443,6 +1443,7 @@
         }
         case 'sec': state.sec = el.dataset.sec; renderCommunity(); break;
         case 'forgot': openForgot(); break;
+        case 'ideas': state.cat = 'todas'; state.q = ''; if ($('#searchInput')) $('#searchInput').value = ''; if (state.route === 'explorar') renderExplore(); break;
         case 'camp-del': await deleteCampaign(el.dataset.id); break;
         case 'cat-maestros': state.cat = 'maestros'; location.hash = '#explorar'; break;
         case 'comments': await toggleComments(el.dataset.post); break;
