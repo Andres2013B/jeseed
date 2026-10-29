@@ -246,7 +246,7 @@ window.Store = (() => {
     const mapCh = r => ({
       id: r.id, actionId: r.action_id, category: r.category, title: r.title, points: r.points,
       isDaily: r.is_daily, status: r.status, acceptedAt: r.accepted_at, completedAt: r.completed_at,
-      evidence: r.evidence, authorName: r.profiles?.display_name
+      evidence: r.evidence
     });
     const mapPost = (r, liked = new Set(), reported = new Set()) => ({
       id: r.id, userId: r.user_id, authorName: r.author_name, content: r.content, category: r.category,
@@ -323,10 +323,17 @@ window.Store = (() => {
       },
 
       async listToVerify() {
-        const { data, error } = await sb.from('user_challenges').select('*,profiles(display_name)')
+        const { data, error } = await sb.from('user_challenges').select('*')
           .eq('status', 'review').order('completed_at', { ascending: true });
         fail(error);
-        return data.map(mapCh);
+        const ids = [...new Set(data.map(r => r.user_id))];
+        const names = {};
+        if (ids.length) {
+          const res = await sb.from('profiles').select('id,display_name').in('id', ids);
+          fail(res.error);
+          res.data.forEach(p => { names[p.id] = p.display_name; });
+        }
+        return data.map(r => ({ ...mapCh(r), authorName: names[r.user_id] }));
       },
       async verifyChallenge(rowId, approve) {
         const { error } = await sb.from('user_challenges')
