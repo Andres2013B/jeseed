@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="description" content="JESSED · Colegio Olami ORT. Pequeñas acciones, grandes cambios.">
+  <style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style>
+  <title>JESSED</title>
+  <link rel="icon" href="img/logo.webp">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+<aside class="sidebar">
+    <a class="brand" href="#inicio" aria-label="JESSED, inicio"><img src="img/logo.webp" alt="JESSED"></a>
+    <div class="brand-sub">COLEGIO OLAMI ORT</div>
+    <nav aria-label="Principal">
+      <a href="#inicio" data-route="inicio"><i>⌂</i><span>Mi día</span></a>
+      <a href="#explorar" data-route="explorar"><i>✳</i><span>Explorar acciones</span></a>
+      <a href="#retos" data-route="retos"><i>⚑</i><span>Mis retos</span><b id="navCount">0</b></a>
+      <a href="#comunidad" data-route="comunidad"><i>♡</i><span>Comunidad</span></a>
+      <a href="#admin" data-route="admin" class="admin-link" hidden><i>⛨</i><span>Moderación</span></a>
+    </nav>
+    <div class="side-bottom">
+      <div class="side-note">El bien empieza<br>con algo pequeño.<span>Y contigo.</span></div>
+      <a class="user" href="#perfil" data-route="perfil">
+        <span class="avatar" id="sideAvatar">T</span>
+        <div><strong>Mi perfil ↗</strong><small>Puntos, racha e historial</small></div>
+      </a>
+    </div>
+  </aside>
+
+  <div class="shell">
+    <header class="topbar">
+      <div class="topbar-left">
+        <span class="header-label">TU DOSIS DIARIA DE BIEN</span>
+        <span class="beta" id="modeTag">BETA</span>
+        <span id="authSlot"></span>
+      </div>
+      <div class="institution-brand">
+        <img src="img/logo.webp" alt="">
+        <div><span>COLEGIO OLAMI ORT</span><strong>JESSED</strong></div>
+      </div>
+    </header>
+
+    <main id="main">
+      <section class="ceremony-panel" id="ceremony"></section>
+
+      <!-- MI DÍA -->
+      <section class="view" id="view-inicio">
+        <div class="intro"><div><h1>Hacer el bien se siente bien.</h1><p>Tu próxima buena acción empieza aquí.</p></div><span class="date">UN PEQUEÑO GESTO. UN NUEVO COMIENZO.</span></div>
+        <section class="hero">
+          <div class="hero-copy">
+            <div class="eyebrow">PEQUEÑAS ACCIONES, GRANDES CAMBIOS</div>
+            <h2>¿Qué buena acción<br>harás hoy?</h2>
+            <p>No necesitas cambiar el mundo en un día.<br>Empieza por el mundo de alguien.</p>
+            <button class="primary" data-act="discover">Descubre tu Jesed <span>↗</span></button>
+          </div>
+          <div class="hero-art" aria-hidden="true">
+            <div class="orbit"></div><div class="orbit two"></div>
+            <span class="spark">✧</span><span class="spark bottom">✧</span>
+            <div class="flower"><div class="petal"></div><div class="petal"></div><div class="petal"></div><div class="petal"></div><div class="petal"></div><div class="petal"></div><div class="flower-center">♡</div></div>
+          </div>
+        </section>
+
+        <section class="home-community">
+          <div class="section-head">
+            <div><span class="eyebrow">COMUNIDAD JESSED</span><h2>El bien está pasando cerca de ti.</h2><p>Comparte tu acción o inspírate con la de alguien más.</p></div>
+            <a class="text-btn" href="#comunidad">Ver más buenas acciones ↗</a>
+          </div>
+          <div class="home-composer" data-slot="composer"></div>
+          <div class="community-preview" id="homePosts"></div>
+        </section>
+
+        <div data-slot="stats"></div>
+        <div data-slot="streak"></div>
+
+        <div class="section-head"><div><h2>Pequeños gestos para empezar</h2><p>Encuentra una acción que conecte contigo.</p></div><a class="text-btn" href="#explorar">Ver todas ↗</a></div>
+        <div class="grid" id="homeCards"></div>
+
+        <div class="bottom-grid"><section class="daily" id="dailyCard"></section></div>
+        <div data-slot="review"></div>
+        <div data-slot="recognition"></div>
+      </section>
+
+      <!-- EXPLORAR -->
+      <section class="view" id="view-explorar" hidden>
+        <div class="intro"><div><h1>Siempre hay una forma de ayudar.</h1><p>Explora acciones para cada persona y cada momento.</p></div></div>
+        <div class="toolbar">
+          <input class="search" id="searchInput" type="search" aria-label="Buscar buenas acciones" placeholder="Buscar una buena acción…" autocomplete="off">
+          <button class="primary" data-act="discover">Sorpréndeme ✧</button>
+        </div>
+        <div class="filters" id="filters"></div>
+        <div class="grid" id="results"></div>
+      </section>
+
+      <!-- MIS RETOS -->
+      <section class="view" id="view-retos" hidden>
+        <div class="intro"><div><h1>Tus intenciones, en acción.</h1><p>Un paso pequeño también es un paso importante.</p></div></div>
+        <div data-slot="stats"></div>
+        <div data-slot="streak"></div>
+        <div class="section-head"><h2 id="activeTitle">Retos en curso · 0</h2><a href="#explorar" class="text-btn">Elegir un reto ↗</a></div>
+        <div class="grid" id="activeCards"></div>
+        <div data-slot="review"></div>
+      </section>
+
+      <!-- COMUNIDAD -->
+      <section class="view" id="view-comunidad" hidden>
+        <div class="intro"><div><h1>Nuestra comunidad hace el bien.</h1><p>Comparte una acción propia e inspírate con las historias de los demás.</p></div></div>
+        <div class="community-tabs">
+          <button class="primary" data-act="go-form">＋ Compartir mi acción</button>
+          <button class="text-btn" data-act="go-feed">Ver buenas acciones ↓</button>
+        </div>
+        <div data-slot="composer"></div>
+        <div data-slot="review"></div>
+        <div class="section-head" id="feedHead"><div><h2>Acciones que nos inspiran</h2><p>Cada publicación pasa por revisión antes de aparecer aquí.</p></div></div>
+        <div id="feed"></div>
+        <section class="history leaders" id="destacados"></section>
+        <div data-slot="recognition"></div>
+      </section>
+
+      <!-- PERFIL -->
+      <section class="view" id="view-perfil" hidden>
+        <div class="intro"><div><h1>Cada acción deja huella.</h1><p>Este es el bien que has puesto en movimiento.</p></div></div>
+        <div id="profileTop"></div>
+        <div data-slot="stats"></div>
+        <div data-slot="streak"></div>
+        <div id="profileBody"></div>
+        <div data-slot="review"></div>
+        <div data-slot="recognition"></div>
+      </section>
+
+      <!-- MODERACIÓN -->
+      <section class="view" id="view-admin" hidden>
+        <div class="intro"><div><h1>Moderación</h1><p>Revisa las acciones antes de que aparezcan en la comunidad.</p></div></div>
+        <div id="adminContent"></div>
+      </section>
+    </main>
+
+    <footer class="site-footer">Pequeñas acciones, grandes cambios. <span>COLEGIO OLAMI ORT · JESSED</span></footer>
+  </div>
+
+  <!-- Diálogo genérico (descubre, felicitación, confirmación) -->
+  <div class="modal" id="dialog" hidden role="dialog" aria-modal="true">
+    <div class="modal-backdrop" data-close="dialog"></div>
+    <div class="modal-dialog">
+      <button class="close" data-close="dialog" aria-label="Cerrar">×</button>
+      <div id="dialogBody"></div>
+    </div>
+  </div>
+
+  <!-- Registro / inicio de sesión -->
+  <div class="modal" id="authModal" hidden role="dialog" aria-modal="true" aria-labelledby="authTitle">
+    <div class="modal-backdrop" data-close="authModal"></div>
+    <div class="modal-dialog">
+      <button class="close" data-close="authModal" aria-label="Cerrar">×</button>
+      <div class="eyebrow">ACCESO OLAMI ORT</div>
+      <div class="auth-tabs">
+        <button type="button" class="auth-tab" data-act="auth-mode" data-mode="login">Entrar</button>
+        <button type="button" class="auth-tab" data-act="auth-mode" data-mode="register">Crear cuenta</button>
+      </div>
+      <h2 id="authTitle">Entrar</h2>
+      <p id="authSubtitle"></p>
+      <form id="authForm" novalidate>
+        <label class="field" id="nameField"><span>Tu nombre</span><input class="search" id="authName" maxlength="40" autocomplete="nickname" placeholder="¿Cómo te llamas?"></label>
+        <label class="field"><span>Correo de la escuela</span><input class="search" id="authEmail" type="email" autocomplete="email" placeholder="tu.nombre@olamiort.edu.mx" aria-describedby="authEmailHint"><small id="authEmailHint" style="opacity:.7;font-size:12px;margin-top:4px">Usa tu correo de la escuela (@olamiort.edu.mx).</small></label>
+        <label class="field"><span>Contraseña</span><input class="search" id="authPass" type="password" placeholder="Mínimo 6 caracteres"></label>
+        <p class="form-error" id="authError" role="alert"></p>
+        <button class="primary block" id="authSubmit" type="submit">Entrar</button>
+      </form>
+      <p class="auth-note" id="authModeNote"></p>
+    </div>
+  </div>
+
+  <div id="toast" role="status" aria-live="polite"></div>
+  <canvas id="confetti" hidden aria-hidden="true"></canvas>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4"></script>
+  <script src="js/config.js"></script>
+  <script src="js/data.js"></script>
+  <script src="js/store.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
