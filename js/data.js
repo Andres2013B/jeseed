@@ -33,6 +33,14 @@ const isSchoolEmail = email => {
 };
 const SCHOOL_EMAIL_ERROR = `Solo puedes entrar con tu correo de la escuela (@${SCHOOL_DOMAIN}).`;
 
+/* Secciones del colegio (para filtrar la comunidad) */
+const SECTIONS = [
+  { id: 'kinder',     name: 'Kinder',     color: '#a6d45c' },
+  { id: 'primaria',   name: 'Primaria',   color: '#F5A524' },
+  { id: 'secundaria', name: 'Secundaria', color: '#64418e' },
+  { id: 'prepa',      name: 'Prepa',      color: '#1F9D9A' }
+];
+
 const CATEGORIES = [
   { id: 'familia',     name: 'Familia',              icon: '🏡', color: '#FF7849', desc: 'El Jesed empieza en casa.' },
   { id: 'escuela',     name: 'En la escuela',        icon: '🏫', color: '#0EA5A4', desc: 'Tu salón y tu escuela, un lugar mejor.' },

@@ -39,9 +39,16 @@
         <span class="beta" id="modeTag">BETA</span>
         <span id="authSlot"></span>
       </div>
-      <div class="institution-brand">
-        <img src="img/logo.webp" alt="">
-        <div><span>COLEGIO OLAMI ORT</span><strong>JESSED</strong></div>
+      <div class="top-actions">
+        <button class="icon-btn" data-act="notices" aria-label="Avisos">🔔<b id="noticeCount" hidden>0</b></button>
+        <div class="more">
+          <button class="icon-btn" data-act="more" aria-haspopup="true" aria-expanded="false" aria-label="Más opciones">⋯</button>
+          <div class="more-menu" id="moreMenu" hidden>
+            <button data-act="share-app">🔗 Compartir la página</button>
+            <button data-act="feedback">💬 Enviar una opinión</button>
+            <a href="#perfil">👤 Mi perfil</a>
+          </div>
+        </div>
       </div>
     </header>
 
@@ -64,6 +71,10 @@
             <div class="flower"><div class="petal"></div><div class="petal"></div><div class="petal"></div><div class="petal"></div><div class="petal"></div><div class="petal"></div><div class="flower-center">♡</div></div>
           </div>
         </section>
+
+        <section class="gallery" id="gallery" hidden></section>
+
+        <div data-slot="goal"></div>
 
         <section class="home-community">
           <div class="section-head">
@@ -101,6 +112,8 @@
         <div class="intro"><div><h1>Tus intenciones, en acción.</h1><p>Un paso pequeño también es un paso importante.</p></div></div>
         <div data-slot="stats"></div>
         <div data-slot="streak"></div>
+        <p class="retos-summary" id="retosSummary"></p>
+        <div data-slot="goal"></div>
         <div class="section-head"><h2 id="activeTitle">Retos en curso · 0</h2><a href="#explorar" class="text-btn">Elegir un reto ↗</a></div>
         <div class="grid" id="activeCards"></div>
         <div data-slot="review"></div>
@@ -116,6 +129,7 @@
         <div data-slot="composer"></div>
         <div data-slot="review"></div>
         <div class="section-head" id="feedHead"><div><h2>Acciones que nos inspiran</h2><p>Cada publicación pasa por revisión antes de aparecer aquí.</p></div></div>
+        <div class="filters section-filters" id="sectionFilters"></div>
         <div id="feed"></div>
         <section class="history leaders" id="destacados"></section>
         <div data-slot="recognition"></div>
@@ -165,6 +179,7 @@
       <p id="authSubtitle"></p>
       <form id="authForm" novalidate>
         <label class="field" id="nameField"><span>Tu nombre</span><input class="search" id="authName" maxlength="40" autocomplete="nickname" placeholder="¿Cómo te llamas?"></label>
+        <label class="field" id="sectionField"><span>Tu sección</span><select class="search" id="authSection"></select></label>
         <label class="field"><span id="authEmailLabel">Correo</span><input class="search" id="authEmail" type="email" autocomplete="email" placeholder="tu@correo.com" aria-describedby="authEmailHint"><small id="authEmailHint" style="opacity:.7;font-size:12px;margin-top:4px"></small></label>
         <label class="field"><span>Contraseña</span><input class="search" id="authPass" type="password" placeholder="Mínimo 6 caracteres"></label>
         <p class="form-error" id="authError" role="alert"></p>

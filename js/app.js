@@ -24,7 +24,13 @@
     authMode: 'login',
     prefill: null,
     scrollTo: null,
-    confirmResolve: null
+    confirmResolve: null,
+    sec: 'todas',          // filtro de sección en Comunidad ('todas', id de sección o 'guardadas')
+    openComments: new Set(),
+    comments: {},
+    gallery: [],
+    galleryIndex: 0,
+    galleryPaused: false
   };
 
   /* ---------------------------------------------------------- Utilidades */
@@ -34,6 +40,12 @@
   const firstName = name => String(name || '').trim().split(/\s+/)[0];
   const same = (a, b) => String(a) === String(b);
   const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+  const secById = id => SECTIONS.find(s => s.id === id);
+
+  /* Preferencias de cada persona en este navegador (meta, guardadas, avisos vistos) */
+  const prefKey = k => `jesed_${k}_${state.user?.id || 'anon'}`;
+  function pref(k, d) { try { const v = JSON.parse(localStorage.getItem(prefKey(k))); return v ?? d; } catch { return d; } }
+  function setPref(k, v) { try { localStorage.setItem(prefKey(k), JSON.stringify(v)); } catch { /* nada */ } }
 
   function dayKey(d) {
     const x = new Date(d);
@@ -177,6 +189,12 @@
     $('#authTitle').textContent = reg ? 'Únete a JESSED' : 'Qué gusto verte de nuevo';
     $('#authSubtitle').textContent = reg ? 'Crea tu cuenta para guardar tus retos, puntos e insignias.' : 'Entra para seguir sumando buenas acciones.';
     $('#nameField').hidden = !reg;
+    $('#sectionField').hidden = !reg;
+    if (!$('#authSection').options.length) {
+      $('#authSection').innerHTML = '<option value="">Elige tu sección…</option>'
+        + SECTIONS.map(s => `<option value="${s.id}">${esc(s.name)}</option>`).join('')
+        + '<option value="staff">Maestro / staff</option>';
+    }
     $('#authSubmit').textContent = reg ? 'Crear mi cuenta ↗' : 'Entrar ↗';
     $('#authPass').autocomplete = reg ? 'new-password' : 'current-password';
     $$('.auth-tab').forEach(t => t.classList.toggle('active', t.dataset.mode === mode));
@@ -192,8 +210,10 @@
     const name = $('#authName').value.trim();
     const email = $('#authEmail').value.trim();
     const password = $('#authPass').value;
+    const section = $('#authSection').value;
     const errEl = $('#authError');
     errEl.textContent = '';
+    if (reg && !section) { errEl.textContent = 'Elige tu sección.'; return; }
     if (reg && name.length < 2) { errEl.textContent = 'Escribe tu nombre (mínimo 2 letras).'; return; }
     if (reg && !Moderation.isClean(name)) { errEl.textContent = 'Elige un nombre respetuoso, por favor.'; return; }
     if (!/^\S+@\S+\.\S+$/.test(email)) { errEl.textContent = 'Escribe un correo válido.'; return; }
@@ -203,7 +223,7 @@
     const btn = $('#authSubmit');
     btn.disabled = true;
     try {
-      const res = reg ? await Store.signUp({ name, email, password }) : await Store.signIn({ email, password });
+      const res = reg ? await Store.signUp({ name, email, password, section }) : await Store.signIn({ email, password });
       if (res.needsConfirm) {
         closeModal('authModal');
         toast('📬 Te mandamos un correo para confirmar tu cuenta. Después entra con tu correo y contraseña.');
@@ -215,6 +235,7 @@
       toast(reg ? `¡Bienvenido a JESSED, ${firstName(state.user.name)}! 💜` : `¡Hola de nuevo, ${firstName(state.user.name)}!`);
       await refreshPosts();
       renderAll();
+      renderGallery();
       if (state.pendingAction) {
         const id = state.pendingAction;
         state.pendingAction = null;
@@ -230,6 +251,7 @@
     state.user = null;
     state.challenges = [];
     toast('Cerraste sesión. ¡Nos vemos pronto!');
+    renderGallery();
     await refreshPosts();
     if (location.hash !== '#inicio') location.hash = '#inicio'; else renderAll();
   }
@@ -261,7 +283,7 @@
   }
 
   /* Fotos de evidencia: se achican antes de subirlas (solo las ven los moderadores) */
-  const photos = { ownPhoto: null, verifyPhoto: null };
+  const photos = { ownPhoto: null, verifyPhoto: null, galleryPhoto: null };
 
   function shrinkImage(file, max = 1280) {
     return new Promise((resolve, reject) => {
@@ -492,6 +514,7 @@
       <label class="check-label"><input type="checkbox" id="ownVoluntary"> Fue una acción voluntaria y no un castigo o una tarea impuesta.</label>
       <label class="check-label"><input type="checkbox" id="ownHonest"> Prometo que de verdad hice esta acción.</label>
       <label class="check-label"><input type="checkbox" id="ownShare" checked> Compartirla en la comunidad para inspirar a otros.</label>
+      <label class="check-label"><input type="checkbox" id="ownAnon"> Publicar sin mi nombre (aparece como “Anónimo”).</label>
       <div class="notice">Un responsable de Olami ORT la verifica antes de sumar los puntos. Si la compartes, pasa por revisión antes de publicarse. Repetir una publicación no multiplica los puntos.</div>
       <button class="primary" id="ownSubmit" type="submit">Registrar mi acción <span>↗</span></button>
       ${locked ? `<div class="locked-cover"><span>🔒 Entra con tu cuenta para registrar tu acción</span><button type="button" class="primary dark" data-act="login">Acceso Olami ORT ↗</button></div>` : ''}
@@ -537,23 +560,70 @@
     const cat = catById(p.category);
     const mine = state.user && same(p.userId, state.user.id);
     const approved = p.status === 'approved';
+    const sec = secById(p.section);
+    const saved = pref('saved', []).includes(String(p.id));
+    const open = state.openComments.has(String(p.id));
     return `<article class="post">
       <div class="post-head">
-        <span class="avatar">${esc(initial(p.authorName))}</span>
-        <div><strong>${esc(p.authorName)}</strong><small>${cat ? esc(cat.name) + ' · ' : ''}${timeAgo(p.createdAt)}</small></div>
+        <span class="avatar ${p.anonymous ? 'anon' : ''}">${p.anonymous ? '✧' : esc(initial(p.authorName))}</span>
+        <div><strong>${esc(p.authorName)}</strong><small>${sec ? `<i class="sec-dot" style="background:${sec.color}"></i>${esc(sec.name)} · ` : ''}${cat ? esc(cat.name) + ' · ' : ''}${timeAgo(p.createdAt)}</small></div>
         ${!approved ? `<span class="status ${p.status}">${p.status === 'pending' ? 'EN REVISIÓN' : 'NO APROBADA'}</span>` : ''}
       </div>
       <p>${esc(p.content)}</p>
       <div class="post-actions">
         <button class="like ${p.likedByMe ? 'liked' : ''}" data-act="like" data-post="${esc(p.id)}" ${approved ? '' : 'disabled'}>♡ Me inspira · ${p.likes}</button>
+        ${approved ? `<button class="like ${open ? 'on' : ''}" data-act="comments" data-post="${esc(p.id)}">💬 ${p.comments || 0}</button>
+        <button class="like ${saved ? 'on' : ''}" data-act="save" data-post="${esc(p.id)}" aria-pressed="${saved}">${saved ? '★ Guardada' : '☆ Guardar'}</button>` : ''}
         ${compact ? '' : mine
           ? `<button class="mini-link" data-act="delete-post" data-post="${esc(p.id)}">Borrar</button>`
           : `<button class="mini-link" data-act="report" data-post="${esc(p.id)}" ${p.reportedByMe ? 'disabled' : ''}>${p.reportedByMe ? 'Reportada' : 'Reportar'}</button>`}
       </div>
+      ${open ? commentsHtml(p) : ''}
     </article>`;
   }
 
-  const SLOTS = { stats: statsHtml, streak: streakHtml, composer: composerHtml, review: reviewHtml, recognition: recognitionHtml };
+  function commentsHtml(p) {
+    const list = state.comments[p.id];
+    return `<div class="comments">
+      ${!list ? '<p class="empty-line">Cargando comentarios…</p>'
+        : list.length ? list.map(c => `
+          <div class="comment"><span class="avatar">${esc(initial(c.authorName))}</span>
+            <div><strong>${esc(c.authorName)}</strong> <small>${timeAgo(c.createdAt)}</small><p>${esc(c.content)}</p></div>
+            ${state.user && (same(c.userId, state.user.id) || state.user.isAdmin) ? `<button class="mini-link" data-act="del-comment" data-post="${esc(p.id)}" data-id="${esc(c.id)}">Borrar</button>` : ''}
+          </div>`).join('')
+        : '<p class="empty-line">Sé la primera persona en dejar un mensaje bonito.</p>'}
+      ${state.user
+        ? `<form class="comment-form" data-post="${esc(p.id)}"><input class="search" name="c" maxlength="280" placeholder="Escribe algo que anime…" autocomplete="off"><button class="accept go">Enviar</button></form>`
+        : '<button class="text-btn" data-act="login">Entra para comentar ↗</button>'}
+    </div>`;
+  }
+
+  /* Meta semanal: cuántas acciones quiero enviar esta semana */
+  function weekStart() {
+    const d = new Date(); d.setHours(0, 0, 0, 0);
+    d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+    return d;
+  }
+
+  function goalHtml() {
+    if (!state.user) return '';
+    const goal = pref('goal', 3);
+    const since = weekStart();
+    const done = state.challenges.filter(c => (c.status === 'review' || c.status === 'completed') && c.completedAt && new Date(c.completedAt) >= since).length;
+    const pct = Math.min(100, Math.round(done / goal * 100));
+    return `<section class="goal">
+      <div class="goal-ring" style="--p:${pct}"><strong>${Math.min(done, goal)}<small>/${goal}</small></strong></div>
+      <div class="goal-copy">
+        <div class="eyebrow">MI META DE LA SEMANA</div>
+        <h3>${done >= goal ? '¡Meta cumplida! 🎉' : `${plural(goal - done, 'acción más', 'acciones más')} para tu meta`}</h3>
+        <div class="goal-pick" role="group" aria-label="Cambiar meta semanal">
+          ${[1, 2, 3, 4, 5, 7].map(n => `<button class="${n === goal ? 'active' : ''}" data-act="goal" data-n="${n}" aria-pressed="${n === goal}">${n}</button>`).join('')}
+        </div>
+      </div>
+    </section>`;
+  }
+
+  const SLOTS = { goal: goalHtml, stats: statsHtml, streak: streakHtml, composer: composerHtml, review: reviewHtml, recognition: recognitionHtml };
 
   /* ---------------------------------------------------------- Render */
   function renderAll() { renderChrome(); renderRoute(); }
@@ -566,6 +636,9 @@
       ? `<span class="access-btn" style="color:var(--ink)">Hola, ${esc(firstName(state.user.name))}</span>`
       : `<button class="access-btn" data-act="login">Acceso Olami ORT ↗</button>`;
     $$('.admin-link').forEach(a => { a.hidden = !state.user?.isAdmin; });
+    const n = noticeList().filter(x => x.fresh).length;
+    $('#noticeCount').textContent = n;
+    $('#noticeCount').hidden = !n;
   }
 
   function renderCeremony() {
@@ -597,7 +670,7 @@
     window.scrollTo(0, 0);
     renderRoute();
     if (['inicio', 'comunidad', 'perfil'].includes(state.route)) {
-      refreshPosts().then(() => { renderRoute(); doScroll(); });
+      refreshPosts().then(() => { renderAll(); doScroll(); });
     } else doScroll();
   }
 
@@ -676,15 +749,23 @@
   function renderRetos() {
     const active = state.challenges.filter(c => c.status === 'accepted');
     $('#activeTitle').textContent = `Retos en curso · ${active.length}`;
+    const count = st => state.challenges.filter(c => c.status === st).length;
+    $('#retosSummary').innerHTML = state.user
+      ? `<span><b>${active.length}</b> por hacer</span><span><b>${count('review')}</b> en revisión</span><span><b>${count('completed')}</b> aprobadas</span><span><b>${count('rejected')}</b> no aprobadas</span>`
+      : '';
     $('#activeCards').innerHTML = active.length
       ? active.map(r => actionById(r.actionId)).filter(Boolean).map(card).join('')
       : `<div class="empty"><h3>Tu próximo gesto te está esperando.</h3><p>Elige una acción y vuelve aquí cuando la hayas realizado.</p><a class="primary" href="#explorar">Explorar acciones ↗</a></div>`;
   }
 
   function renderCommunity() {
-    const feed = state.posts.filter(p => p.status === 'approved');
+    const chips = [{ id: 'todas', name: 'Todas' }, ...SECTIONS, { id: 'guardadas', name: '★ Guardadas' }];
+    $('#sectionFilters').innerHTML = chips.map(c => `<button class="filter ${state.sec === c.id ? 'active' : ''}" data-act="sec" data-sec="${c.id}">${c.color ? `<i class="sec-dot" style="background:${c.color}"></i>` : ''}${esc(c.name)}</button>`).join('');
+    const saved = pref('saved', []);
+    const feed = state.posts.filter(p => p.status === 'approved'
+      && (state.sec === 'todas' || (state.sec === 'guardadas' ? saved.includes(String(p.id)) : p.section === state.sec)));
     $('#feed').innerHTML = feed.length ? feed.map(p => postHtml(p)).join('')
-      : '<div class="empty"><h3>Todavía no hay historias publicadas.</h3><p>Sé la primera persona en inspirar a la comunidad.</p></div>';
+      : `<div class="empty"><h3>${state.sec === 'guardadas' ? 'Aún no guardas publicaciones.' : 'Todavía no hay historias aquí.'}</h3><p>${state.sec === 'guardadas' ? 'Toca ☆ Guardar en las que te inspiren para tenerlas a la mano.' : 'Sé la primera persona en inspirar a la comunidad.'}</p></div>`;
     const medals = ['🥇', '🥈', '🥉'];
     $('#destacados').innerHTML = `
       <h2>Destacados de la semana</h2>
@@ -713,6 +794,13 @@
         <div>
           <h2>${esc(state.user.name)}</h2>
           <p>Miembro de la comunidad · Colegio Olami ORT${state.user.isAdmin ? ' · Moderador' : ''}</p>
+          <label class="sec-select">Sección:
+            <select id="profileSection">
+              <option value="">Sin elegir</option>
+              ${SECTIONS.map(s => `<option value="${s.id}" ${state.user.section === s.id ? 'selected' : ''}>${esc(s.name)}</option>`).join('')}
+              <option value="staff" ${state.user.section === 'staff' ? 'selected' : ''}>Maestro / staff</option>
+            </select>
+          </label>
           <div class="level-line"><span>${lv.cur.icon} Nivel ${esc(lv.cur.name)}</span><span>${lv.next ? `${lv.next.min - s.points} pts para ${esc(lv.next.name)}` : 'Nivel máximo'}</span></div>
           <div class="progress"><span style="width:${lv.pct}%"></span></div>
         </div>
@@ -745,7 +833,7 @@
     }
     el.innerHTML = '<p class="empty-line">Cargando…</p>';
     try {
-      const [toVerify, list] = await Promise.all([Store.listToVerify(), Store.listPending()]);
+      const [toVerify, list, feedback] = await Promise.all([Store.listToVerify(), Store.listPending(), Store.listFeedback().catch(() => [])]);
       el.innerHTML = `<section class="review-box">
         <div class="section-head"><div><h2>Acciones por verificar · ${toVerify.length}</h2><p>Los puntos solo se suman cuando apruebas. Si algo no parece real, recházalo.</p></div></div>
         ${toVerify.length ? toVerify.map(c => `
@@ -775,6 +863,24 @@
               <button class="mini-link link-danger" data-act="admin-delete" data-post="${esc(p.id)}">Eliminar</button>
             </div>
           </div>`).join('') : '<p class="empty-line">Todo al día. ¡Gracias por cuidar la comunidad!</p>'}
+      </section>
+      <section class="review-box">
+        <div class="section-head"><div><h2>Galería “Jesed en acción” · ${state.gallery.length}</h2><p>Fotos de servicio social y actividades (Eishel, DAR…). Aparecen en “Mi día” para todos.</p></div></div>
+        <form id="galleryForm" class="gallery-form" novalidate>
+          ${photoField('galleryPhoto').replace('Foto de evidencia', 'Foto').replace('Solo la ven los moderadores. ', '')}
+          <label class="lbl" for="galleryTitle">Programa o actividad</label>
+          <input class="search" id="galleryTitle" maxlength="40" placeholder="Por ejemplo: Eishel">
+          <label class="lbl" for="galleryCaption">Descripción corta</label>
+          <input class="search" id="galleryCaption" maxlength="90" placeholder="Por ejemplo: Visita a la casa de abuelos">
+          <button class="primary dark" id="gallerySubmit" type="submit" style="margin-top:16px">Agregar a la galería <span>＋</span></button>
+        </form>
+        <div class="gallery-admin">${state.gallery.map(g => `
+          <figure><img src="${esc(g.url)}" alt="${esc(g.title)}"><figcaption>${esc(g.title)}<button class="mini-link link-danger" data-act="gallery-del" data-id="${esc(g.id)}">Quitar</button></figcaption></figure>`).join('')}</div>
+      </section>
+      <section class="review-box">
+        <div class="section-head"><div><h2>Opiniones · ${feedback.length}</h2><p>Lo que la comunidad nos dice para mejorar.</p></div></div>
+        ${feedback.length ? feedback.map(f => `<div class="review-row"><strong>${esc(f.authorName)}</strong><p>${esc(f.content)}</p><small>${timeAgo(f.createdAt)}</small></div>`).join('')
+          : '<p class="empty-line">Todavía no hay opiniones.</p>'}
       </section>`;
     } catch (e) { el.innerHTML = `<p class="form-error">${esc(e.message)}</p>`; }
   }
@@ -805,7 +911,7 @@
       state.challenges.unshift(row);
       let shared = false;
       if (share) {
-        try { await Store.createPost(state.user, { content: `${title} — ${desc}`, category }); shared = true; }
+        try { await Store.createPost(state.user, { content: `${title} — ${desc}`, category, anonymous: $('#ownAnon').checked }); shared = true; }
         catch (err) { toast(`Tu acción se guardó, pero no se pudo compartir: ${err.message}`, 'error'); }
       }
       $('#ownForm').reset();
@@ -875,11 +981,227 @@
     if (state.route === 'comunidad') { renderRoute(); doScroll(); } else location.hash = '#comunidad';
   }
 
+  /* ---------------------------------------------------------- Comentarios y guardadas */
+  async function toggleComments(postId) {
+    const id = String(postId);
+    if (state.openComments.has(id)) { state.openComments.delete(id); renderRoute(); return; }
+    state.openComments.add(id);
+    renderRoute();
+    try { state.comments[id] = await Store.listComments(id); }
+    catch (e) { state.comments[id] = []; toast(e.message, 'error'); }
+    renderRoute();
+  }
+
+  async function submitComment(form) {
+    const id = form.dataset.post;
+    const input = form.elements.c;
+    const text = input.value.trim();
+    if (!text) return;
+    input.disabled = true;
+    try {
+      await Store.addComment(state.user, id, text);
+      state.comments[id] = await Store.listComments(id);
+      const p = state.posts.find(x => same(x.id, id));
+      if (p) p.comments = state.comments[id].length;
+      renderRoute();
+      $(`.comment-form[data-post="${CSS.escape(id)}"] input`)?.focus();
+    } catch (e) { toast(e.message, 'error'); input.disabled = false; }
+  }
+
+  async function deleteComment(postId, commentId) {
+    if (!(await askConfirm('¿Borrar este comentario?', 'Borrar'))) return;
+    closeModal('dialog');
+    try {
+      await Store.deleteComment(commentId);
+      state.comments[postId] = await Store.listComments(postId);
+      const p = state.posts.find(x => same(x.id, postId));
+      if (p) p.comments = state.comments[postId].length;
+      renderRoute();
+    } catch (e) { toast(e.message, 'error'); }
+  }
+
+  function toggleSave(postId) {
+    if (!state.user) { openAuth('login'); return; }
+    const id = String(postId);
+    const saved = pref('saved', []);
+    setPref('saved', saved.includes(id) ? saved.filter(x => x !== id) : [...saved, id]);
+    toast(saved.includes(id) ? 'Quitada de tus guardadas.' : 'Guardada ★ La encuentras en Comunidad → Guardadas.');
+    renderRoute();
+  }
+
+  /* ---------------------------------------------------------- Avisos */
+  function noticeList() {
+    if (!state.user) return [];
+    const seen = pref('seen', []);
+    const items = [];
+    state.challenges.forEach(c => {
+      if (c.status === 'completed') items.push({ key: `c:${c.id}:ok`, icon: '✅', text: `Aprobaron tu acción “${c.title}”: +${c.points} puntos.`, at: c.verifiedAt || c.completedAt });
+      if (c.status === 'rejected') items.push({ key: `c:${c.id}:no`, icon: '✕', text: `Tu acción “${c.title}” no fue aprobada.`, at: c.verifiedAt || c.completedAt });
+    });
+    myPosts().forEach(p => {
+      if (p.status === 'approved') items.push({ key: `p:${p.id}:ok`, icon: '📣', text: 'Tu publicación ya está en la comunidad.', at: p.createdAt });
+      if (p.status === 'rejected') items.push({ key: `p:${p.id}:no`, icon: '✕', text: 'Una de tus publicaciones no fue aprobada.', at: p.createdAt });
+    });
+    return items.map(x => ({ ...x, fresh: !seen.includes(x.key) }))
+      .sort((a, b) => new Date(b.at) - new Date(a.at)).slice(0, 20);
+  }
+
+  function openNotices() {
+    if (!state.user) { openAuth('login'); return; }
+    const list = noticeList();
+    showDialog(`
+      <div class="eyebrow">AVISOS</div>
+      <h2>Lo nuevo para ti</h2>
+      ${list.length ? `<div class="notice-list">${list.map(n => `
+        <div class="notice-item ${n.fresh ? 'fresh' : ''}"><span>${n.icon}</span><p>${esc(n.text)}<small>${timeAgo(n.at)}</small></p></div>`).join('')}</div>`
+        : '<p>No hay avisos todavía. Cuando un responsable revise tus acciones, te avisamos aquí.</p>'}`);
+    setPref('seen', list.map(n => n.key).concat(pref('seen', [])).slice(0, 300));
+    renderChrome();
+  }
+
+  /* ---------------------------------------------------------- Menú "más", compartir y opiniones */
+  function toggleMore(force) {
+    const menu = $('#moreMenu');
+    const show = force ?? menu.hidden;
+    menu.hidden = !show;
+    $('[data-act="more"]').setAttribute('aria-expanded', String(show));
+  }
+
+  async function shareApp() {
+    toggleMore(false);
+    const url = location.origin + location.pathname;
+    const data = { title: 'JESSED · Olami ORT', text: 'Únete a JESSED: pequeñas acciones, grandes cambios.', url };
+    try {
+      if (navigator.share) { await navigator.share(data); return; }
+      await navigator.clipboard.writeText(url);
+      toast('Link copiado 🔗 ¡Compártelo!');
+    } catch { toast(url); }
+  }
+
+  function openFeedback() {
+    toggleMore(false);
+    showDialog(`
+      <div class="eyebrow">TU OPINIÓN</div>
+      <h2>¿Cómo podemos mejorar?</h2>
+      <p>Cuéntanos qué te gusta, qué no funciona o qué idea tienes. Lo leen los responsables.</p>
+      <form id="feedbackForm" novalidate>
+        <textarea id="feedbackText" maxlength="500" placeholder="Escribe aquí…"></textarea>
+        <p class="form-error" id="feedbackError" role="alert"></p>
+        <div class="dialog-actions"><button class="primary dark" type="submit">Enviar opinión ↗</button></div>
+      </form>`);
+    setTimeout(() => $('#feedbackText')?.focus(), 50);
+  }
+
+  async function submitFeedback(e) {
+    e.preventDefault();
+    const text = $('#feedbackText').value.trim();
+    const check = Moderation.isClean(text);
+    if (text.length < 5) { $('#feedbackError').textContent = 'Escribe un poco más.'; return; }
+    if (!check) { $('#feedbackError').textContent = 'Usa palabras respetuosas, por favor.'; return; }
+    try {
+      await Store.sendFeedback(state.user, text);
+      closeModal('dialog');
+      toast('¡Gracias! Recibimos tu opinión 💜');
+    } catch (err) { $('#feedbackError').textContent = err.message; }
+  }
+
+  /* ---------------------------------------------------------- Meta y sección */
+  function setGoal(n) {
+    setPref('goal', n);
+    renderRoute();
+  }
+
+  async function setSection(section) {
+    try {
+      const u = await Store.updateProfile(state.user.id, { section });
+      if (u) state.user = u;
+      toast('Sección actualizada.');
+      renderAll();
+    } catch (e) { toast(e.message, 'error'); }
+  }
+
+  /* ---------------------------------------------------------- Galería "Jesed en acción" */
+  let galleryTimer = null;
+
+  async function loadGallery() {
+    try { state.gallery = await Store.listGallery(); }
+    catch { state.gallery = []; }
+    renderGallery();
+  }
+
+  function renderGallery() {
+    const box = $('#gallery');
+    const list = state.gallery;
+    clearInterval(galleryTimer);
+    if (!list.length) {
+      box.hidden = !state.user?.isAdmin;
+      box.innerHTML = state.user?.isAdmin
+        ? '<div class="gallery-empty"><strong>📸 Galería “Jesed en acción”</strong><p>Agrega fotos de servicio social desde Moderación y aparecerán aquí para todos.</p><a class="text-btn" href="#admin">Ir a Moderación ↗</a></div>'
+        : '';
+      return;
+    }
+    box.hidden = false;
+    state.galleryIndex %= list.length;
+    const cur = list[state.galleryIndex];
+    box.innerHTML = `
+      <div class="gallery-head">
+        <div><div class="eyebrow">JESED EN ACCIÓN · SERVICIO SOCIAL</div><h2>${esc(cur.title)}</h2><p>${esc(cur.caption || '')}</p></div>
+        <div class="gallery-ctrl">
+          <button data-act="gallery-prev" aria-label="Foto anterior">‹</button>
+          <button data-act="gallery-pause" aria-label="${state.galleryPaused ? 'Reproducir' : 'Pausar'}">${state.galleryPaused ? '▶' : 'Ⅱ'}</button>
+          <button data-act="gallery-next" aria-label="Foto siguiente">›</button>
+        </div>
+      </div>
+      <div class="gallery-strip">${list.map((g, i) => `
+        <button class="polaroid ${i === state.galleryIndex ? 'current' : ''}" data-act="gallery-go" data-i="${i}" style="--tilt:${[-3, 2, -1.5, 3, -2.5][i % 5]}deg">
+          <img src="${esc(g.url)}" alt="${esc(g.title)}${g.caption ? ': ' + esc(g.caption) : ''}" loading="lazy">
+          <span>${esc(g.title)}</span>
+        </button>`).join('')}</div>`;
+    const curEl = box.querySelector('.polaroid.current');
+    const strip = box.querySelector('.gallery-strip');
+    if (curEl && strip) strip.scrollTo({ left: curEl.offsetLeft - (strip.clientWidth - curEl.clientWidth) / 2, behavior: reduceMotion ? 'auto' : 'smooth' });
+    if (!state.galleryPaused && !reduceMotion && list.length > 1) {
+      galleryTimer = setInterval(() => { if (state.route === 'inicio' && !document.hidden) galleryGo(state.galleryIndex + 1); }, 4500);
+    }
+  }
+
+  function galleryGo(i) {
+    const n = state.gallery.length;
+    if (!n) return;
+    state.galleryIndex = (i + n) % n;
+    renderGallery();
+  }
+
+  async function submitGallery(e) {
+    e.preventDefault();
+    const title = $('#galleryTitle').value.trim();
+    const caption = $('#galleryCaption').value.trim();
+    if (!photos.galleryPhoto) { toast('Elige una foto.', 'error'); return; }
+    if (title.length < 2) { toast('Escribe el nombre del programa o actividad.', 'error'); return; }
+    const btn = $('#gallerySubmit');
+    btn.disabled = true;
+    try {
+      await Store.addGalleryPhoto(photos.galleryPhoto, { title, caption });
+      photos.galleryPhoto = null;
+      await loadGallery();
+      toast('Foto agregada a la galería 📸');
+      renderAdmin();
+    } catch (err) { toast(err.message, 'error'); btn.disabled = false; }
+  }
+
+  async function deleteGallery(id) {
+    if (!(await askConfirm('¿Quitar esta foto de la galería?', 'Quitar'))) return;
+    closeModal('dialog');
+    try { await Store.deleteGalleryPhoto(id); await loadGallery(); renderAdmin(); }
+    catch (e) { toast(e.message, 'error'); }
+  }
+
   /* ---------------------------------------------------------- Eventos */
   function bindEvents() {
     document.addEventListener('click', async (e) => {
       const closer = e.target.closest('[data-close]');
       if (closer) { closeModal(closer.dataset.close); return; }
+      if (!e.target.closest('.more')) toggleMore(false);
       const el = e.target.closest('[data-act]');
       if (!el || el.disabled) return;
       const busy = async (fn) => { el.disabled = true; try { await fn(); } finally { if (el.isConnected) el.disabled = false; } };
@@ -909,6 +1231,20 @@
           goForm({ title: el.dataset.title, cat: row?.category });
           break;
         }
+        case 'sec': state.sec = el.dataset.sec; renderCommunity(); break;
+        case 'comments': await toggleComments(el.dataset.post); break;
+        case 'del-comment': await deleteComment(el.dataset.post, el.dataset.id); break;
+        case 'save': toggleSave(el.dataset.post); break;
+        case 'goal': setGoal(Number(el.dataset.n)); break;
+        case 'notices': openNotices(); break;
+        case 'more': toggleMore(); break;
+        case 'share-app': await shareApp(); break;
+        case 'feedback': openFeedback(); break;
+        case 'gallery-prev': galleryGo(state.galleryIndex - 1); break;
+        case 'gallery-next': galleryGo(state.galleryIndex + 1); break;
+        case 'gallery-go': state.galleryPaused = true; galleryGo(Number(el.dataset.i)); break;
+        case 'gallery-pause': state.galleryPaused = !state.galleryPaused; renderGallery(); break;
+        case 'gallery-del': await deleteGallery(el.dataset.id); break;
         case 'go-feed': $('#feedHead').scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth' }); break;
         case 'go-leaders':
           state.scrollTo = 'destacados';
@@ -921,6 +1257,9 @@
       if (e.target.id === 'ownForm') submitOwn(e);
       if (e.target.id === 'verifyForm') submitVerify(e);
       if (e.target.id === 'authForm') submitAuth(e);
+      if (e.target.id === 'feedbackForm') submitFeedback(e);
+      if (e.target.id === 'galleryForm') submitGallery(e);
+      if (e.target.classList.contains('comment-form')) { e.preventDefault(); submitComment(e.target); }
     });
 
     document.addEventListener('input', (e) => {
@@ -930,6 +1269,7 @@
 
     document.addEventListener('change', async (e) => {
       const id = e.target.id;
+      if (id === 'profileSection') { await setSection(e.target.value); return; }
       if (!(id in photos)) return;
       const file = e.target.files && e.target.files[0];
       const box = $('#' + id + 'Preview');
@@ -943,7 +1283,7 @@
     });
 
     document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape') $$('.modal').filter(m => !m.hidden).forEach(m => closeModal(m.id));
+      if (e.key === 'Escape') { $$('.modal').filter(m => !m.hidden).forEach(m => closeModal(m.id)); toggleMore(false); }
     });
 
     window.addEventListener('hashchange', onRoute);
@@ -967,6 +1307,7 @@
     }
     renderChrome();
     onRoute();
+    loadGallery();
 
     Store.onAuthChange(() => setTimeout(async () => {
       const u = await Store.getUser();
@@ -975,6 +1316,7 @@
         await loadUserData();
         await refreshPosts();
         renderAll();
+        renderGallery();
       }
     }, 0));
   }

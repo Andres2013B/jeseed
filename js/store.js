@@ -13,13 +13,14 @@ window.Store = (() => {
   function createLocalStore() {
     const K = {
       users: 'jesed_users', session: 'jesed_session', ch: 'jesed_challenges',
-      posts: 'jesed_posts', likes: 'jesed_likes', reports: 'jesed_reports', seeded: 'jesed_seeded'
+      posts: 'jesed_posts', likes: 'jesed_likes', reports: 'jesed_reports', seeded: 'jesed_seeded',
+      comments: 'jesed_comments', feedback: 'jesed_feedback', gallery: 'jesed_gallery'
     };
     const read = (k, d) => { try { const v = JSON.parse(localStorage.getItem(k)); return v ?? d; } catch { return d; } };
     const write = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* sin espacio o bloqueado */ } };
     const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
     const nowIso = () => new Date().toISOString();
-    const pub = u => ({ id: u.id, name: u.name, email: u.email, isAdmin: !!u.isAdmin });
+    const pub = u => ({ id: u.id, name: u.name, email: u.email, isAdmin: !!u.isAdmin, section: u.section || null });
     const same = (a, b) => String(a) === String(b);
     const toDataUrl = blob => !blob ? Promise.resolve(null) : new Promise(res => {
       const r = new FileReader(); r.onload = () => res(r.result); r.onerror = () => res(null); r.readAsDataURL(blob);
@@ -58,7 +59,8 @@ window.Store = (() => {
         likes: likes.filter(l => same(l.postId, p.id)).length,
         likedByMe: !!userId && likes.some(l => same(l.postId, p.id) && same(l.userId, userId)),
         reportedByMe: !!userId && reports.some(r => same(r.postId, p.id) && same(r.userId, userId)),
-        reports: reports.filter(r => same(r.postId, p.id)).length
+        reports: reports.filter(r => same(r.postId, p.id)).length,
+        comments: read(K.comments, []).filter(c => same(c.postId, p.id)).length
       };
     }
 
@@ -73,12 +75,12 @@ window.Store = (() => {
         if (u && !isSchoolEmail(u.email)) { try { localStorage.removeItem(K.session); } catch { /* nada */ } return null; }
         return u ? pub(u) : null;
       },
-      async signUp({ name, email, password }) {
+      async signUp({ name, email, password, section }) {
         email = email.trim().toLowerCase();
         if (!isSchoolEmail(email)) throw new Error(SCHOOL_EMAIL_ERROR);
         const users = read(K.users, []);
         if (users.some(u => u.email === email)) throw new Error('Ya existe una cuenta con ese correo.');
-        const u = { id: uid(), name: name.trim(), email, passHash: await hash(password), isAdmin: users.length === 0, createdAt: nowIso() };
+        const u = { id: uid(), name: name.trim(), email, section: section || null, passHash: await hash(password), isAdmin: users.length === 0, createdAt: nowIso() };
         users.push(u);
         write(K.users, users);
         write(K.session, u.id);
@@ -93,6 +95,12 @@ window.Store = (() => {
         return { user: pub(u) };
       },
       async signOut() { try { localStorage.removeItem(K.session); } catch { /* nada */ } },
+      async updateProfile(userId, { section }) {
+        const users = read(K.users, []);
+        const u = users.find(x => same(x.id, userId));
+        if (u) { u.section = section || null; write(K.users, users); }
+        return u ? pub(u) : null;
+      },
 
       async getChallenges(userId) {
         return read(K.ch, []).filter(c => same(c.userId, userId))
@@ -157,7 +165,7 @@ window.Store = (() => {
           .slice(0, 50)
           .map(p => decoratePost(p, userId));
       },
-      async createPost(user, { content, category }) {
+      async createPost(user, { content, category, anonymous }) {
         const check = Moderation.check(content);
         if (!check.ok) throw new Error(check.reason);
         const posts = read(K.posts, []);
@@ -165,7 +173,10 @@ window.Store = (() => {
         if (posts.filter(p => same(p.userId, user.id) && new Date(p.createdAt) > hourAgo).length >= 5) {
           throw new Error('Llegaste al límite de publicaciones por hora. ¡Intenta más tarde!');
         }
-        posts.push({ id: uid(), userId: user.id, authorName: user.name, content: content.trim(), category: category || null, status: 'pending', createdAt: nowIso() });
+        posts.push({
+          id: uid(), userId: user.id, authorName: anonymous ? 'Anónimo' : user.name, anonymous: !!anonymous, section: user.section || null,
+          content: content.trim(), category: category || null, status: 'pending', createdAt: nowIso()
+        });
         write(K.posts, posts);
       },
       async toggleLike(userId, postId, liked) {
@@ -197,6 +208,44 @@ window.Store = (() => {
         const posts = read(K.posts, []);
         const p = posts.find(x => same(x.id, postId));
         if (p) { p.status = status; write(K.posts, posts); }
+      },
+
+      async listComments(postId) {
+        return read(K.comments, []).filter(c => same(c.postId, postId))
+          .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+      },
+      async addComment(user, postId, content) {
+        const check = Moderation.check(content);
+        if (!check.ok) throw new Error(check.reason);
+        const all = read(K.comments, []);
+        all.push({ id: uid(), postId, userId: user.id, authorName: user.name, content: content.trim(), createdAt: nowIso() });
+        write(K.comments, all);
+      },
+      async deleteComment(id) {
+        write(K.comments, read(K.comments, []).filter(c => !same(c.id, id)));
+      },
+
+      async sendFeedback(user, text) {
+        const all = read(K.feedback, []);
+        all.push({ id: uid(), authorName: user?.name || 'Visitante', content: text.trim(), createdAt: nowIso() });
+        write(K.feedback, all);
+      },
+      async listFeedback() {
+        return read(K.feedback, []).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+      },
+
+      async listGallery() {
+        return read(K.gallery, []).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+      },
+      async addGalleryPhoto(blob, { title, caption }) {
+        const url = await toDataUrl(blob);
+        const all = read(K.gallery, []);
+        all.push({ id: uid(), url, title: title.trim(), caption: caption.trim(), createdAt: nowIso() });
+        try { localStorage.setItem(K.gallery, JSON.stringify(all)); }
+        catch { throw new Error('No hay espacio para más fotos en el modo demo.'); }
+      },
+      async deleteGalleryPhoto(id) {
+        write(K.gallery, read(K.gallery, []).filter(g => !same(g.id, id)));
       },
 
       async leaderboard() {
@@ -240,16 +289,17 @@ window.Store = (() => {
     const fail = (error) => { if (error) throw new Error(friendly(error.message)); };
 
     async function profile(user) {
-      const { data } = await sb.from('profiles').select('display_name,is_admin').eq('id', user.id).maybeSingle();
+      const { data } = await sb.from('profiles').select('display_name,is_admin,section').eq('id', user.id).maybeSingle();
       return {
         id: user.id,
         email: user.email,
+        section: data?.section || null,
         name: data?.display_name || user.user_metadata?.display_name || (user.email || '').split('@')[0],
         isAdmin: !!data?.is_admin
       };
     }
     const mapCh = r => ({
-      id: r.id, userId: r.user_id, actionId: r.action_id, category: r.category, title: r.title, points: r.points,
+      id: r.id, userId: r.user_id, verifiedAt: r.verified_at, actionId: r.action_id, category: r.category, title: r.title, points: r.points,
       isDaily: r.is_daily, status: r.status, acceptedAt: r.accepted_at, completedAt: r.completed_at,
       evidence: r.evidence, photoPath: r.photo_path
     });
@@ -263,7 +313,8 @@ window.Store = (() => {
     }
     const mapPost = (r, liked = new Set(), reported = new Set()) => ({
       id: r.id, userId: r.user_id, authorName: r.author_name, content: r.content, category: r.category,
-      status: r.status, createdAt: r.created_at,
+      status: r.status, createdAt: r.created_at, section: r.section, anonymous: r.anonymous,
+      comments: r.post_comments?.[0]?.count ?? 0,
       likes: r.post_likes?.[0]?.count ?? 0,
       reports: r.post_reports?.[0]?.count ?? 0,
       likedByMe: liked.has(String(r.id)),
@@ -281,11 +332,11 @@ window.Store = (() => {
         if (!isSchoolEmail(session.user.email)) { await sb.auth.signOut(); return null; }
         return profile(session.user);
       },
-      async signUp({ name, email, password }) {
+      async signUp({ name, email, password, section }) {
         if (!isSchoolEmail(email)) throw new Error(SCHOOL_EMAIL_ERROR);
         const { data, error } = await sb.auth.signUp({
           email, password,
-          options: { data: { display_name: name }, emailRedirectTo: location.origin + location.pathname }
+          options: { data: { display_name: name, section }, emailRedirectTo: location.origin + location.pathname }
         });
         fail(error);
         if (!data.session) return { needsConfirm: true };
@@ -298,6 +349,12 @@ window.Store = (() => {
         return { user: await profile(data.user) };
       },
       async signOut() { await sb.auth.signOut(); },
+      async updateProfile(userId, { section }) {
+        const { error } = await sb.from('profiles').update({ section: section || null }).eq('id', userId);
+        fail(error);
+        const { data: { session } } = await sb.auth.getSession();
+        return session ? profile(session.user) : null;
+      },
 
       async getChallenges(userId) {
         const { data, error } = await sb.from('user_challenges').select('*').eq('user_id', userId).order('accepted_at', { ascending: false });
@@ -364,7 +421,7 @@ window.Store = (() => {
 
       async listPosts(userId) {
         const { data, error } = await sb.from('posts')
-          .select('id,user_id,author_name,content,category,status,created_at,post_likes(count)')
+          .select('id,user_id,author_name,content,category,status,created_at,section,anonymous,post_likes(count),post_comments(count)')
           .order('created_at', { ascending: false }).limit(50);
         fail(error);
         let liked = new Set(), reported = new Set();
@@ -381,8 +438,8 @@ window.Store = (() => {
           .filter(p => p.status === 'approved' || (userId && p.user_id === userId))
           .map(p => mapPost(p, liked, reported));
       },
-      async createPost(user, { content, category }) {
-        const { error } = await sb.from('posts').insert({ content: content.trim(), category: category || null, author_name: user.name });
+      async createPost(user, { content, category, anonymous }) {
+        const { error } = await sb.from('posts').insert({ content: content.trim(), category: category || null, author_name: user.name, anonymous: !!anonymous });
         fail(error);
       },
       async toggleLike(userId, postId, liked) {
@@ -410,6 +467,52 @@ window.Store = (() => {
       },
       async setPostStatus(postId, status) {
         const { error } = await sb.from('posts').update({ status }).eq('id', postId);
+        fail(error);
+      },
+
+      async listComments(postId) {
+        const { data, error } = await sb.from('post_comments').select('*').eq('post_id', postId).order('created_at', { ascending: true });
+        fail(error);
+        return data.map(c => ({ id: c.id, postId: c.post_id, userId: c.user_id, authorName: c.author_name, content: c.content, createdAt: c.created_at }));
+      },
+      async addComment(user, postId, content) {
+        const check = Moderation.check(content);
+        if (!check.ok) throw new Error(check.reason);
+        const { error } = await sb.from('post_comments').insert({ post_id: postId, content: content.trim(), author_name: user.name });
+        fail(error);
+      },
+      async deleteComment(id) {
+        const { error } = await sb.from('post_comments').delete().eq('id', id);
+        fail(error);
+      },
+
+      async sendFeedback(user, text) {
+        const { error } = await sb.from('feedback').insert({ content: text.trim(), author_name: user?.name || 'Visitante' });
+        fail(error);
+      },
+      async listFeedback() {
+        const { data, error } = await sb.from('feedback').select('*').order('created_at', { ascending: false }).limit(100);
+        fail(error);
+        return data.map(f => ({ id: f.id, authorName: f.author_name, content: f.content, createdAt: f.created_at }));
+      },
+
+      async listGallery() {
+        const { data, error } = await sb.from('gallery').select('*').order('created_at', { ascending: false }).limit(30);
+        fail(error);
+        return data.map(g => ({
+          id: g.id, title: g.title, caption: g.caption, createdAt: g.created_at,
+          url: sb.storage.from('galeria').getPublicUrl(g.path).data.publicUrl
+        }));
+      },
+      async addGalleryPhoto(blob, { title, caption }) {
+        const path = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.jpg`;
+        const up = await sb.storage.from('galeria').upload(path, blob, { contentType: 'image/jpeg' });
+        if (up.error) throw new Error('No se pudo subir la foto.');
+        const { error } = await sb.from('gallery').insert({ path, title: title.trim(), caption: caption.trim() });
+        fail(error);
+      },
+      async deleteGalleryPhoto(id) {
+        const { error } = await sb.from('gallery').delete().eq('id', id);
         fail(error);
       },
 
