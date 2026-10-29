@@ -699,6 +699,7 @@
   }
 
   function onRoute() {
+    toggleMenu(false);
     const r = location.hash.replace(/^#/, '');
     state.route = ROUTES.includes(r) ? r : 'inicio';
     $$('.view').forEach(v => { v.hidden = v.id !== 'view-' + state.route; });
@@ -1406,6 +1407,14 @@
     } catch (e2) { err.textContent = e2.message; }
   }
 
+  /* Menú lateral en celular */
+  function toggleMenu(force) {
+    const open = force ?? !document.body.classList.contains('menu-open');
+    document.body.classList.toggle('menu-open', open);
+    $('.drawer-backdrop').hidden = !open;
+    $('.menu-btn').setAttribute('aria-expanded', String(open));
+  }
+
   /* ---------------------------------------------------------- Eventos */
   function bindEvents() {
     document.addEventListener('click', async (e) => {
@@ -1443,6 +1452,8 @@
         }
         case 'sec': state.sec = el.dataset.sec; renderCommunity(); break;
         case 'forgot': openForgot(); break;
+        case 'menu': toggleMenu(); break;
+        case 'menu-close': toggleMenu(false); break;
         case 'ideas': state.cat = 'todas'; state.q = ''; if ($('#searchInput')) $('#searchInput').value = ''; if (state.route === 'explorar') renderExplore(); break;
         case 'camp-del': await deleteCampaign(el.dataset.id); break;
         case 'cat-maestros': state.cat = 'maestros'; location.hash = '#explorar'; break;
@@ -1501,7 +1512,7 @@
     });
 
     document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape') { $$('.modal').filter(m => !m.hidden).forEach(m => closeModal(m.id)); toggleMore(false); }
+      if (e.key === 'Escape') { $$('.modal').filter(m => !m.hidden).forEach(m => closeModal(m.id)); toggleMore(false); toggleMenu(false); }
     });
 
     window.addEventListener('hashchange', onRoute);

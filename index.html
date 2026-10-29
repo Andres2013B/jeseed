@@ -10,10 +10,11 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/styles.css">
+  <link rel="stylesheet" href="css/styles.css?v=9">
 </head>
 <body>
-<aside class="sidebar">
+<div class="drawer-backdrop" data-act="menu-close" hidden></div>
+  <aside class="sidebar" id="sidebar">
     <a class="brand" href="#inicio" aria-label="Maayan Jessed, inicio">
       <span class="brand-top">MAAYAN</span>
       <img src="img/logo.webp" alt="Maayan Jessed">
@@ -41,6 +42,10 @@
   </aside>
 
   <div class="shell">
+    <div class="mobile-head">
+      <button class="menu-btn" data-act="menu" aria-label="Abrir menú" aria-expanded="false">☰</button>
+      <a class="mobile-brand" href="#inicio"><img src="img/logo.webp" alt=""><span>MAAYAN <b>JESSED</b></span></a>
+    </div>
     <header class="topbar">
       <div class="topbar-left">
         <span class="header-label">TU DOSIS DIARIA DE BIEN</span>
@@ -212,9 +217,9 @@
   <canvas id="confetti" hidden aria-hidden="true"></canvas>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4"></script>
-  <script src="js/config.js"></script>
-  <script src="js/data.js"></script>
-  <script src="js/store.js"></script>
-  <script src="js/app.js"></script>
+  <script src="js/config.js?v=9"></script>
+  <script src="js/data.js?v=9"></script>
+  <script src="js/store.js?v=9"></script>
+  <script src="js/app.js?v=9"></script>
 </body>
 </html>
