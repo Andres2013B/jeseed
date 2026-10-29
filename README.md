@@ -2,7 +2,7 @@
 
 Página de buenas acciones (Jesed) para alumnos del Colegio Olami ORT.
 
-- Solo se entra con correo de la escuela (`@olamiort.edu.mx`).
+- Se entra con cualquier correo (para limitarlo a la escuela, pon el dominio en `SCHOOL_DOMAIN` de `js/config.js`).
 - Los retos se envían a verificación y un moderador los aprueba antes de sumar puntos.
 - Datos en Supabase (`js/config.js`). Las reglas de seguridad están en `supabase/schema.sql`.
 

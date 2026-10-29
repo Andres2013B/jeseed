@@ -223,7 +223,7 @@ window.Store = (() => {
 
     function friendly(msg = '') {
       const m = msg.toLowerCase();
-      if (m.includes('database error saving new user')) return SCHOOL_EMAIL_ERROR;
+      if (m.includes('database error saving new user')) return SCHOOL_DOMAIN ? SCHOOL_EMAIL_ERROR : 'No se pudo crear la cuenta. Inténtalo de nuevo.';
       if (m.includes('invalid login')) return 'Correo o contraseña incorrectos.';
       if (m.includes('already registered')) return 'Ya existe una cuenta con ese correo.';
       if (m.includes('email not confirmed')) return 'Primero confirma tu correo (revisa tu bandeja de entrada).';

@@ -181,8 +181,9 @@
     $('#authPass').autocomplete = reg ? 'new-password' : 'current-password';
     $$('.auth-tab').forEach(t => t.classList.toggle('active', t.dataset.mode === mode));
     $('#authError').textContent = '';
-    $('#authEmail').placeholder = `tu.nombre@${SCHOOL_DOMAIN}`;
-    $('#authEmailHint').textContent = `Usa tu correo de la escuela (@${SCHOOL_DOMAIN}).`;
+    $('#authEmail').placeholder = SCHOOL_DOMAIN ? `tu.nombre@${SCHOOL_DOMAIN}` : 'tu@correo.com';
+    $('#authEmailLabel').textContent = SCHOOL_DOMAIN ? 'Correo de la escuela' : 'Correo';
+    $('#authEmailHint').textContent = SCHOOL_DOMAIN ? `Usa tu correo de la escuela (@${SCHOOL_DOMAIN}).` : '';
   }
 
   async function submitAuth(e) {

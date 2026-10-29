@@ -4,7 +4,7 @@
 -- Se puede volver a correr sin problema.
 --
 -- Reglas que protege la base de datos (aunque alguien modifique la página):
---   · Solo se pueden crear cuentas con correo @olamiort.edu.mx
+--   · Se puede entrar con cualquier correo (hay que confirmarlo)
 --   · Solo los correos de la tabla "moderators" son moderadores
 --   · Nadie se puede dar puntos solo: toda acción queda "en verificación"
 --     hasta que un moderador la aprueba, y nadie aprueba sus propias acciones
@@ -35,13 +35,10 @@ alter table public.profiles enable row level security;
 drop policy if exists "profiles: leer" on public.profiles;
 create policy "profiles: leer" on public.profiles for select to authenticated using (true);
 
--- Solo correos de la escuela + crear el perfil al registrarse
+-- Crear el perfil al registrarse
 create or replace function public.handle_new_user() returns trigger
 language plpgsql security definer set search_path = public as $$
 begin
-  if lower(new.email) not like '%@olamiort.edu.mx' then
-    raise exception 'Solo puedes entrar con tu correo de la escuela (@olamiort.edu.mx).';
-  end if;
   insert into public.profiles (id, display_name, is_admin)
   values (
     new.id,
@@ -56,18 +53,9 @@ drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created after insert on auth.users
   for each row execute function public.handle_new_user();
 
-create or replace function public.check_school_email() returns trigger
-language plpgsql as $$
-begin
-  if lower(new.email) not like '%@olamiort.edu.mx' then
-    raise exception 'Solo puedes entrar con tu correo de la escuela (@olamiort.edu.mx).';
-  end if;
-  return new;
-end $$;
-
+-- (Antes solo se aceptaban correos de la escuela; se quitó esa regla)
 drop trigger if exists check_school_email on auth.users;
-create trigger check_school_email before insert or update of email on auth.users
-  for each row execute function public.check_school_email();
+drop function if exists public.check_school_email();
 
 -- Mantener is_admin al día cuando se agregan o quitan moderadores
 create or replace function public.sync_moderators() returns trigger

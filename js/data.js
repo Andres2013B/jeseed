@@ -26,10 +26,10 @@ const VERIFY = {
 };
 
 /* Acceso solo con correo de la escuela (dominio configurado en js/config.js) */
-const SCHOOL_DOMAIN = String((window.JESED_CONFIG || {}).SCHOOL_DOMAIN || 'olamiort.edu.mx').trim().toLowerCase();
+const SCHOOL_DOMAIN = String((window.JESED_CONFIG || {}).SCHOOL_DOMAIN || '').trim().toLowerCase();
 const isSchoolEmail = email => {
   const e = String(email || '').trim().toLowerCase();
-  return /^[^\s@]+@[^\s@]+$/.test(e) && e.endsWith('@' + SCHOOL_DOMAIN);
+  return /^[^\s@]+@[^\s@]+$/.test(e) && (!SCHOOL_DOMAIN || e.endsWith('@' + SCHOOL_DOMAIN));
 };
 const SCHOOL_EMAIL_ERROR = `Solo puedes entrar con tu correo de la escuela (@${SCHOOL_DOMAIN}).`;
 

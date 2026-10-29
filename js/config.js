@@ -7,8 +7,9 @@
   (La anon key es pública por diseño; la seguridad la dan las reglas RLS de supabase/schema.sql)
 */
 window.JESED_CONFIG = {
-  // Solo se permiten cuentas con correo de este dominio (ej. nombre@olamiort.edu.mx)
-  SCHOOL_DOMAIN: "olamiort.edu.mx",
+  // Déjalo vacío para aceptar cualquier correo.
+  // Para aceptar solo correos de la escuela, pon el dominio: "olamiort.edu.mx"
+  SCHOOL_DOMAIN: "",
   SUPABASE_URL: "https://tcnewagyrlyllxkaazgu.supabase.co",
   SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRjbmV3YWd5cmx5bGx4a2Fhemd1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMyNzI2NDYsImV4cCI6MjEwODg0ODY0Nn0.dPdx-HeE1JQdaXwyOaL1yWSVbE0pOG-DuY18X4WRiYA"
 };
