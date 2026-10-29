@@ -75,6 +75,7 @@
         <section class="gallery" id="gallery" hidden></section>
 
         <div data-slot="goal"></div>
+        <div data-slot="cup"></div>
 
         <section class="home-community">
           <div class="section-head">
@@ -87,6 +88,8 @@
 
         <div data-slot="stats"></div>
         <div data-slot="streak"></div>
+
+        <div id="campaignsHome"></div>
 
         <div class="section-head"><div><h2>Pequeños gestos para empezar</h2><p>Encuentra una acción que conecte contigo.</p></div><a class="text-btn" href="#explorar">Ver todas ↗</a></div>
         <div class="grid" id="homeCards"></div>
@@ -131,6 +134,7 @@
         <div class="section-head" id="feedHead"><div><h2>Acciones que nos inspiran</h2><p>Cada publicación pasa por revisión antes de aparecer aquí.</p></div></div>
         <div class="filters section-filters" id="sectionFilters"></div>
         <div id="feed"></div>
+        <div data-slot="cup"></div>
         <section class="history leaders" id="destacados"></section>
         <div data-slot="recognition"></div>
       </section>
@@ -185,6 +189,7 @@
         <p class="form-error" id="authError" role="alert"></p>
         <button class="primary block" id="authSubmit" type="submit">Entrar</button>
       </form>
+      <button type="button" class="text-btn forgot" id="forgotBtn" data-act="forgot">¿Olvidaste tu contraseña?</button>
       <p class="auth-note" id="authModeNote"></p>
     </div>
   </div>

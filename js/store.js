@@ -6,6 +6,7 @@
    ========================================================== */
 window.Store = (() => {
   const cfg = window.JESED_CONFIG || {};
+  const recovery = /type=recovery/.test(location.hash);
   const hasSupabase = Boolean(cfg.SUPABASE_URL && cfg.SUPABASE_ANON_KEY && window.supabase && window.supabase.createClient);
   return hasSupabase ? createSupabaseStore(cfg) : createLocalStore();
 
@@ -14,7 +15,8 @@ window.Store = (() => {
     const K = {
       users: 'jesed_users', session: 'jesed_session', ch: 'jesed_challenges',
       posts: 'jesed_posts', likes: 'jesed_likes', reports: 'jesed_reports', seeded: 'jesed_seeded',
-      comments: 'jesed_comments', feedback: 'jesed_feedback', gallery: 'jesed_gallery'
+      comments: 'jesed_comments', feedback: 'jesed_feedback', gallery: 'jesed_gallery',
+      campaigns: 'jesed_campaigns', ceremony: 'jesed_ceremony'
     };
     const read = (k, d) => { try { const v = JSON.parse(localStorage.getItem(k)); return v ?? d; } catch { return d; } };
     const write = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* sin espacio o bloqueado */ } };
@@ -96,6 +98,10 @@ window.Store = (() => {
         return { user: pub(u) };
       },
       async signOut() { try { localStorage.removeItem(K.session); } catch { /* nada */ } },
+      async resetPassword() {
+        throw new Error('En el modo demo no se puede recuperar la contraseña: crea otra cuenta.');
+      },
+      async updatePassword() {},
       async updateProfile(userId, { section }) {
         const users = read(K.users, []);
         const u = users.find(x => same(x.id, userId));
@@ -236,6 +242,38 @@ window.Store = (() => {
         return read(K.feedback, []).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
       },
 
+      async listCampaigns() {
+        const today = new Date().toISOString().slice(0, 10);
+        return read(K.campaigns, []).filter(c => c.endsAt >= today)
+          .sort((a, b) => a.endsAt.localeCompare(b.endsAt));
+      },
+      async addCampaign(c) {
+        const all = read(K.campaigns, []);
+        all.push({ ...c, id: 't' + uid(), createdAt: nowIso() });
+        write(K.campaigns, all);
+      },
+      async deleteCampaign(id) {
+        write(K.campaigns, read(K.campaigns, []).filter(c => !same(c.id, id)));
+      },
+
+      async getCeremony() { return read(K.ceremony, null); },
+      async saveCeremony(value) { write(K.ceremony, value); },
+
+      async sectionRanking() {
+        const since = new Date(); since.setDate(1); since.setHours(0, 0, 0, 0);
+        const users = read(K.users, []);
+        const totals = {};
+        read(K.ch, []).forEach(c => {
+          if (c.status !== 'completed' || new Date(c.completedAt) < since) return;
+          const sec = users.find(u => same(u.id, c.userId))?.section;
+          if (!sec || sec === 'staff') return;
+          totals[sec] = totals[sec] || { points: 0, actions: 0 };
+          totals[sec].points += Number(c.points) || 0;
+          totals[sec].actions += 1;
+        });
+        return Object.entries(totals).map(([section, t]) => ({ section, ...t }));
+      },
+
       async listGallery() {
         return read(K.gallery, []).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
       },
@@ -336,6 +374,7 @@ window.Store = (() => {
 
     return {
       mode: 'supabase',
+      recovery,
       async init() {},
       onAuthChange(cb) { sb.auth.onAuthStateChange((event) => cb(event)); },
 
@@ -362,6 +401,14 @@ window.Store = (() => {
         return { user: await profile(data.user) };
       },
       async signOut() { await sb.auth.signOut(); },
+      async resetPassword(email) {
+        const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: location.origin + location.pathname });
+        fail(error);
+      },
+      async updatePassword(password) {
+        const { error } = await sb.auth.updateUser({ password });
+        fail(error);
+      },
       async updateProfile(userId, { section }) {
         const { error } = await sb.from('profiles').update({ section: section || null }).eq('id', userId);
         fail(error);
@@ -507,6 +554,39 @@ window.Store = (() => {
         const { data, error } = await sb.from('feedback').select('*').order('created_at', { ascending: false }).limit(100);
         fail(error);
         return data.map(f => ({ id: f.id, authorName: f.author_name, content: f.content, createdAt: f.created_at }));
+      },
+
+      async listCampaigns() {
+        const today = new Date().toISOString().slice(0, 10);
+        const { data, error } = await sb.from('campaigns').select('*').gte('ends_at', today).order('ends_at', { ascending: true });
+        fail(error);
+        return data.map(c => ({ id: 't' + c.id, dbId: c.id, title: c.title, desc: c.description, icon: c.icon, category: c.category, points: c.points, endsAt: c.ends_at }));
+      },
+      async addCampaign(c) {
+        const { error } = await sb.from('campaigns').insert({
+          title: c.title, description: c.desc, icon: c.icon, category: c.category, points: c.points, ends_at: c.endsAt
+        });
+        fail(error);
+      },
+      async deleteCampaign(id) {
+        const { error } = await sb.from('campaigns').delete().eq('id', String(id).replace(/^t/, ''));
+        fail(error);
+      },
+
+      async getCeremony() {
+        const { data, error } = await sb.from('settings').select('value').eq('key', 'ceremony').maybeSingle();
+        fail(error);
+        return data?.value || null;
+      },
+      async saveCeremony(value) {
+        const { error } = await sb.from('settings').upsert({ key: 'ceremony', value });
+        fail(error);
+      },
+
+      async sectionRanking() {
+        const { data, error } = await sb.rpc('section_ranking');
+        fail(error);
+        return (data || []).map(r => ({ section: r.section, points: Number(r.points), actions: Number(r.actions) }));
       },
 
       async listGallery() {

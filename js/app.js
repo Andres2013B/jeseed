@@ -30,12 +30,17 @@
     comments: {},
     gallery: [],
     galleryIndex: 0,
-    galleryPaused: false
+    galleryPaused: false,
+    campaigns: [],         // retos creados por maestros
+    ceremony: null,        // ceremonia guardada por un moderador
+    ranking: []            // copa de secciones del mes
   };
 
   /* ---------------------------------------------------------- Utilidades */
   const catById = id => CATEGORIES.find(c => c.id === id);
-  const actionById = id => ACTIONS.find(a => a.id === id);
+  const allActions = () => [...state.campaigns, ...ACTIONS];
+  const actionById = id => allActions().find(a => a.id === id);
+  const fmtDay = d => new Date(d + 'T12:00:00').toLocaleDateString('es-MX', { day: 'numeric', month: 'short' });
   const initial = name => (String(name || 'T').trim()[0] || 'T').toUpperCase();
   const firstName = name => String(name || '').trim().split(/\s+/)[0];
   const same = (a, b) => String(a) === String(b);
@@ -190,6 +195,7 @@
     $('#authSubtitle').textContent = reg ? 'Crea tu cuenta para guardar tus retos, puntos e insignias.' : 'Entra para seguir sumando buenas acciones.';
     $('#nameField').hidden = !reg;
     $('#sectionField').hidden = !reg;
+    $('#forgotBtn').hidden = reg;
     if (!$('#authSection').options.length) {
       $('#authSection').innerHTML = '<option value="">Elige tu sección…</option>'
         + SECTIONS.map(s => `<option value="${s.id}">${esc(s.name)}</option>`).join('')
@@ -266,6 +272,8 @@
     catch (e) { state.posts = []; }
     try { state.leaders = await Store.leaderboard(); }
     catch (e) { state.leaders = []; }
+    try { state.ranking = await Store.sectionRanking(); }
+    catch (e) { state.ranking = []; }
     refreshGalleryIfChanged();
   }
 
@@ -433,7 +441,7 @@
   }
 
   function discover() {
-    const pool = ACTIONS.filter(a => a.id !== state.lastRandom);
+    const pool = allActions().filter(a => a.id !== state.lastRandom);
     const a = pool[Math.floor(Math.random() * pool.length)];
     state.lastRandom = a.id;
     const c = catById(a.category);
@@ -463,6 +471,7 @@
         <h3>${esc(a.title)}</h3>
         <p>${esc(a.desc)}${n ? `<br><strong style="color:var(--ok)">✓ Lo has hecho ${plural(n, 'vez', 'veces')}</strong>` : ''}</p>
         ${isDaily ? '<div class="daily-mark">☀ RETO DE HOY · +' + DAILY_BONUS + ' BONUS</div>' : ''}
+        ${a.endsAt ? `<div class="daily-mark campaign-mark">📣 RETO DE MAESTROS · HASTA ${esc(fmtDay(a.endsAt).toUpperCase())}</div>` : ''}
         <div class="card-bottom">
           <span class="points">✧ +${a.points} puntos</span>
           <span>
@@ -626,7 +635,28 @@
     </section>`;
   }
 
-  const SLOTS = { goal: goalHtml, stats: statsHtml, streak: streakHtml, composer: composerHtml, review: reviewHtml, recognition: recognitionHtml };
+  /* Copa de secciones: puntos aprobados de cada sección este mes */
+  function cupHtml() {
+    const month = new Date().toLocaleDateString('es-MX', { month: 'long' });
+    const rows = SECTIONS.map(s => ({ ...s, ...(state.ranking.find(r => r.section === s.id) || { points: 0, actions: 0 }) }))
+      .sort((a, b) => b.points - a.points);
+    const max = Math.max(1, ...rows.map(r => r.points));
+    const mine = state.user?.section;
+    return `<section class="cup">
+      <div class="cup-head"><div><div class="eyebrow">🏆 COPA DE SECCIONES · ${esc(month.toUpperCase())}</div>
+        <h2>${rows[0].points ? `¡${esc(rows[0].name)} va a la cabeza!` : '¿Qué sección empieza a sumar?'}</h2>
+        <p>Cada acción aprobada suma puntos a tu sección. Se reinicia cada mes.</p></div></div>
+      <div class="cup-rows">${rows.map((r, i) => `
+        <div class="cup-row ${r.id === mine ? 'mine' : ''}">
+          <span class="cup-pos">${r.points && i === 0 ? '🏆' : i + 1}</span>
+          <span class="cup-name">${esc(r.name)}${r.id === mine ? '<small>Tu sección</small>' : ''}</span>
+          <span class="cup-bar"><i style="width:${Math.round(r.points / max * 100)}%;background:${r.color}"></i></span>
+          <b>${r.points} pts</b>
+        </div>`).join('')}</div>
+    </section>`;
+  }
+
+  const SLOTS = { cup: cupHtml, goal: goalHtml, stats: statsHtml, streak: streakHtml, composer: composerHtml, review: reviewHtml, recognition: recognitionHtml };
 
   /* ---------------------------------------------------------- Render */
   function renderAll() { renderChrome(); renderRoute(); }
@@ -645,7 +675,10 @@
   }
 
   function renderCeremony() {
-    const target = new Date(CEREMONY.date);
+    const C = { ...CEREMONY, ...(state.ceremony || {}) };
+    $('#ceremony').hidden = !!C.hidden || !C.date;
+    if ($('#ceremony').hidden) return;
+    const target = new Date(C.date);
     const diff = target - Date.now();
     const when = target.toLocaleString('es-MX', { day: 'numeric', month: 'long', year: 'numeric', hour: 'numeric', minute: '2-digit' });
     let clock;
@@ -657,12 +690,12 @@
     }
     $('#ceremony').innerHTML = `
       <div class="ceremony-info">
-        <div class="eyebrow">PRÓXIMA CEREMONIA${CEREMONY.example ? ' · FECHA DE EJEMPLO' : ''}</div>
-        <h2>${esc(CEREMONY.title)}</h2>
+        <div class="eyebrow">PRÓXIMA CEREMONIA${C.example ? ' · FECHA DE EJEMPLO' : ''}</div>
+        <h2>${esc(C.title)}</h2>
         <p>${esc(when)}</p>
-        <small>${esc(CEREMONY.note)}</small>
+        <small>${esc(C.note)}</small>
       </div>
-      <div>${clock}${CEREMONY.example ? '<p class="ceremony-status">Cuenta regresiva de demostración · no es una fecha oficial.</p>' : ''}</div>`;
+      <div>${clock}${C.example ? '<p class="ceremony-status">Cuenta regresiva de demostración · no es una fecha oficial.</p>' : ''}</div>`;
   }
 
   function onRoute() {
@@ -725,6 +758,12 @@
     const daily = todaysDaily();
     const featured = [daily, ...ACTIONS.filter(a => a.id !== daily.id && !activeRow(a.id))].slice(0, 3);
     $('#homeCards').innerHTML = featured.map(card).join('');
+    $('#campaignsHome').innerHTML = state.campaigns.length ? `
+      <section class="campaigns">
+        <div class="section-head"><div><span class="eyebrow">📣 RETOS DE LOS MAESTROS</span><h2>Esta temporada en Olami ORT</h2><p>Retos especiales con fecha límite. ¡Súmate antes de que terminen!</p></div>
+        ${state.campaigns.length > 3 ? '<button class="text-btn" data-act="cat-maestros">Ver todos ↗</button>' : ''}</div>
+        <div class="grid">${state.campaigns.slice(0, 3).map(card).join('')}</div>
+      </section>` : '';
     const today = dayKey(new Date());
     const doneToday = state.challenges.some(x => x.status === 'completed' && x.isDaily && dayKey(x.completedAt) === today);
     const row = activeRow(daily.id);
@@ -740,10 +779,10 @@
   }
 
   function renderExplore() {
-    $('#filters').innerHTML = [{ id: 'todas', name: 'Todas' }, ...CATEGORIES]
+    $('#filters').innerHTML = [{ id: 'todas', name: 'Todas' }, ...(state.campaigns.length ? [{ id: 'maestros', name: '📣 Retos de maestros' }] : []), ...CATEGORIES]
       .map(c => `<button class="filter ${state.cat === c.id ? 'active' : ''}" data-act="cat" data-cat="${c.id}">${esc(c.name)}</button>`).join('');
     const q = norm(state.q.trim());
-    const list = ACTIONS.filter(a => (state.cat === 'todas' || a.category === state.cat)
+    const list = allActions().filter(a => (state.cat === 'todas' || (state.cat === 'maestros' ? a.endsAt : a.category === state.cat))
       && (!q || norm(`${a.title} ${a.desc} ${catById(a.category).name}`).includes(q)));
     $('#results').innerHTML = list.length ? list.map(card).join('')
       : '<div class="empty"><h3>No encontramos acciones con esa búsqueda.</h3><p>Prueba otra palabra o cambia la categoría.</p></div>';
@@ -867,6 +906,42 @@
               <button class="mini-link link-danger" data-act="admin-delete" data-post="${esc(p.id)}">Eliminar</button>
             </div>
           </div>`).join('') : '<p class="empty-line">Todo al día. ¡Gracias por cuidar la comunidad!</p>'}
+      </section>
+      <section class="review-box">
+        <div class="section-head"><div><h2>Retos de maestros · ${state.campaigns.length}</h2><p>Crea retos especiales con fecha límite. Aparecen en “Mi día” y en Explorar para todos.</p></div></div>
+        <form id="campaignForm" class="admin-form" novalidate>
+          <div class="admin-grid">
+            <label><span>Ícono</span><input class="search" id="campIcon" maxlength="4" value="📣"></label>
+            <label class="wide"><span>Título del reto</span><input class="search" id="campTitle" maxlength="60" placeholder="Por ejemplo: Colecta de invierno"></label>
+          </div>
+          <label><span>¿Qué hay que hacer?</span><input class="search" id="campDesc" maxlength="160" placeholder="Trae una cobija o suéter en buen estado al salón antes del viernes."></label>
+          <div class="admin-grid three">
+            <label><span>Categoría</span><select class="search" id="campCat">${CATEGORIES.map(c => `<option value="${c.id}">${esc(c.name)}</option>`).join('')}</select></label>
+            <label><span>Puntos</span><select class="search" id="campPoints"><option>10</option><option selected>15</option><option>20</option></select></label>
+            <label><span>Termina el</span><input class="search" type="date" id="campEnd" min="${new Date().toISOString().slice(0, 10)}"></label>
+          </div>
+          <button class="primary dark" id="campSubmit" type="submit">Crear reto <span>＋</span></button>
+        </form>
+        ${state.campaigns.map(c => `
+          <div class="review-row"><strong>${esc(c.icon)} ${esc(c.title)}</strong><span class="status">HASTA ${esc(fmtDay(c.endsAt).toUpperCase())}</span><span class="status approved">+${c.points} PTS</span>
+            <p>${esc(c.desc)}</p>
+            <button class="mini-link link-danger" data-act="camp-del" data-id="${esc(c.id)}">Quitar reto</button></div>`).join('')}
+      </section>
+      <section class="review-box">
+        <div class="section-head"><div><h2>Ceremonia de reconocimiento</h2><p>Cambia la fecha y el texto de la cuenta regresiva que ven todos arriba.</p></div></div>
+        ${(() => {
+          const C = { ...CEREMONY, ...(state.ceremony || {}) };
+          const local = C.date ? new Date(new Date(C.date).getTime() - new Date().getTimezoneOffset() * 6e4).toISOString().slice(0, 16) : '';
+          return `<form id="ceremonyForm" class="admin-form" novalidate>
+            <label><span>Título</span><input class="search" id="cerTitle" maxlength="70" value="${esc(C.title)}"></label>
+            <div class="admin-grid">
+              <label><span>Fecha y hora</span><input class="search" type="datetime-local" id="cerDate" value="${local}"></label>
+              <label class="wide"><span>Nota</span><input class="search" id="cerNote" maxlength="120" value="${esc(C.note)}"></label>
+            </div>
+            <label class="check-label"><input type="checkbox" id="cerHidden" ${C.hidden ? 'checked' : ''}> Ocultar la cuenta regresiva por ahora</label>
+            <button class="primary dark" type="submit">Guardar ceremonia ✓</button>
+          </form>`;
+        })()}
       </section>
       <section class="review-box">
         <div class="section-head"><div><h2>Fotos extra para la galería · ${state.gallery.length}</h2><p>La galería de “Mi día” se llena sola con las fotos de las publicaciones que apruebas. Aquí puedes agregar fotos de actividades del colegio (Eishel, DAR…).</p></div></div>
@@ -1226,6 +1301,111 @@
     catch (e) { toast(e.message, 'error'); }
   }
 
+  /* ---------------------------------------------------------- Retos de maestros y ceremonia */
+  async function loadCampaigns() {
+    try { state.campaigns = await Store.listCampaigns(); }
+    catch { state.campaigns = []; }
+  }
+
+  async function submitCampaign(e) {
+    e.preventDefault();
+    const c = {
+      icon: $('#campIcon').value.trim() || '📣', title: $('#campTitle').value.trim(), desc: $('#campDesc').value.trim(),
+      category: $('#campCat').value, points: Number($('#campPoints').value), endsAt: $('#campEnd').value
+    };
+    if (c.title.length < 3) { toast('Ponle un título al reto.', 'error'); return; }
+    if (c.desc.length < 10) { toast('Explica qué hay que hacer (mínimo 10 letras).', 'error'); return; }
+    if (!c.endsAt || c.endsAt < new Date().toISOString().slice(0, 10)) { toast('Elige una fecha de fin a partir de hoy.', 'error'); return; }
+    if (!Moderation.isClean(`${c.title} ${c.desc}`)) { toast('Revisa las palabras del reto.', 'error'); return; }
+    $('#campSubmit').disabled = true;
+    try {
+      await Store.addCampaign(c);
+      await loadCampaigns();
+      toast('Reto creado 📣 Ya lo ven todos.');
+      renderAdmin();
+    } catch (err) { toast(err.message, 'error'); $('#campSubmit').disabled = false; }
+  }
+
+  async function deleteCampaign(id) {
+    if (!(await askConfirm('¿Quitar este reto? Quien ya lo aceptó lo conserva en su historial.', 'Quitar'))) return;
+    closeModal('dialog');
+    try { await Store.deleteCampaign(id); await loadCampaigns(); renderAdmin(); }
+    catch (e) { toast(e.message, 'error'); }
+  }
+
+  async function submitCeremony(e) {
+    e.preventDefault();
+    const date = $('#cerDate').value;
+    const value = {
+      title: $('#cerTitle').value.trim() || CEREMONY.title,
+      date: date ? new Date(date).toISOString() : '',
+      note: $('#cerNote').value.trim(),
+      hidden: $('#cerHidden').checked,
+      example: false
+    };
+    try {
+      await Store.saveCeremony(value);
+      state.ceremony = value;
+      renderCeremony();
+      toast('Ceremonia guardada ✓');
+    } catch (err) { toast(err.message, 'error'); }
+  }
+
+  /* ---------------------------------------------------------- Recuperar contraseña */
+  function openForgot() {
+    const email = $('#authEmail').value.trim();
+    closeModal('authModal');
+    showDialog(`
+      <div class="eyebrow">RECUPERAR ACCESO</div>
+      <h2>¿Olvidaste tu contraseña?</h2>
+      <p>Escribe tu correo y te mandamos un link para crear una nueva.</p>
+      <form id="forgotForm" novalidate>
+        <label class="field"><span>Correo</span><input class="search" id="forgotEmail" type="email" autocomplete="email" value="${esc(email)}" placeholder="tu@correo.com"></label>
+        <p class="form-error" id="forgotError" role="alert"></p>
+        <div class="dialog-actions"><button class="primary dark" type="submit">Mandar link ↗</button><button type="button" class="text-btn" data-act="login">Volver a entrar</button></div>
+      </form>`);
+    setTimeout(() => $('#forgotEmail')?.focus(), 50);
+  }
+
+  async function submitForgot(e) {
+    e.preventDefault();
+    const email = $('#forgotEmail').value.trim();
+    if (!/^\S+@\S+\.\S+$/.test(email)) { $('#forgotError').textContent = 'Escribe un correo válido.'; return; }
+    try {
+      await Store.resetPassword(email);
+      showDialog(`<div class="eyebrow">REVISA TU CORREO</div><h2>📬 Te mandamos un link</h2>
+        <p>Si <b>${esc(email)}</b> tiene cuenta, te llegará un correo para crear una contraseña nueva. Revisa también la carpeta de spam.</p>
+        <div class="dialog-actions"><button class="primary" data-close="dialog">Entendido</button></div>`);
+    } catch (err) { $('#forgotError').textContent = err.message; }
+  }
+
+  function openNewPassword() {
+    showDialog(`
+      <div class="eyebrow">NUEVA CONTRASEÑA</div>
+      <h2>Crea tu nueva contraseña</h2>
+      <form id="newPassForm" novalidate>
+        <label class="field"><span>Nueva contraseña</span><input class="search" id="newPass" type="password" autocomplete="new-password" placeholder="Mínimo 6 caracteres"></label>
+        <label class="field"><span>Repítela</span><input class="search" id="newPass2" type="password" autocomplete="new-password"></label>
+        <p class="form-error" id="newPassError" role="alert"></p>
+        <div class="dialog-actions"><button class="primary dark" type="submit">Guardar contraseña ✓</button></div>
+      </form>`);
+    setTimeout(() => $('#newPass')?.focus(), 50);
+  }
+
+  async function submitNewPassword(e) {
+    e.preventDefault();
+    const a = $('#newPass').value, b = $('#newPass2').value;
+    const err = $('#newPassError');
+    if (a.length < 6) { err.textContent = 'Mínimo 6 caracteres.'; return; }
+    if (a !== b) { err.textContent = 'Las contraseñas no coinciden.'; return; }
+    try {
+      await Store.updatePassword(a);
+      closeModal('dialog');
+      history.replaceState(null, '', location.pathname + '#inicio');
+      toast('¡Listo! Tu contraseña se cambió 🔑');
+    } catch (e2) { err.textContent = e2.message; }
+  }
+
   /* ---------------------------------------------------------- Eventos */
   function bindEvents() {
     document.addEventListener('click', async (e) => {
@@ -1262,6 +1442,9 @@
           break;
         }
         case 'sec': state.sec = el.dataset.sec; renderCommunity(); break;
+        case 'forgot': openForgot(); break;
+        case 'camp-del': await deleteCampaign(el.dataset.id); break;
+        case 'cat-maestros': state.cat = 'maestros'; location.hash = '#explorar'; break;
         case 'comments': await toggleComments(el.dataset.post); break;
         case 'del-comment': await deleteComment(el.dataset.post, el.dataset.id); break;
         case 'save': toggleSave(el.dataset.post); break;
@@ -1289,6 +1472,10 @@
       if (e.target.id === 'authForm') submitAuth(e);
       if (e.target.id === 'feedbackForm') submitFeedback(e);
       if (e.target.id === 'galleryForm') submitGallery(e);
+      if (e.target.id === 'campaignForm') submitCampaign(e);
+      if (e.target.id === 'ceremonyForm') submitCeremony(e);
+      if (e.target.id === 'forgotForm') submitForgot(e);
+      if (e.target.id === 'newPassForm') submitNewPassword(e);
       if (e.target.classList.contains('comment-form')) { e.preventDefault(); submitComment(e.target); }
     });
 
@@ -1326,7 +1513,12 @@
     try {
       await Store.init();
       state.user = await Store.getUser();
-      await loadUserData();
+      await Promise.all([
+        loadUserData(),
+        loadCampaigns(),
+        Store.getCeremony().then(c => { state.ceremony = c; }).catch(() => {})
+      ]);
+      renderCeremony();
     } catch (e) {
       console.error(e);
       toast('No pudimos cargar tus datos. Revisa tu conexión.', 'error');
@@ -1338,8 +1530,10 @@
     renderChrome();
     onRoute();
     loadGallery();
+    if (Store.recovery) openNewPassword();
 
-    Store.onAuthChange(() => setTimeout(async () => {
+    Store.onAuthChange((event) => setTimeout(async () => {
+      if (event === 'PASSWORD_RECOVERY' && !$('#newPassForm')) openNewPassword();
       const u = await Store.getUser();
       if ((u?.id || null) !== (state.user?.id || null)) {
         state.user = u;

@@ -551,6 +551,34 @@ input[type=file]::file-selector-button {
 .gallery-admin img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 10px; display: block; }
 .gallery-admin figcaption { font-size: 12px; font-weight: 700; margin-top: 6px; display: flex; justify-content: space-between; align-items: center; gap: 4px; }
 
+/* ---------- Retos de maestros ---------- */
+.campaigns { margin: 30px 0 34px; padding: 28px; border-radius: 28px; background: linear-gradient(135deg, var(--lilac), #f6fbe9); }
+.campaigns .eyebrow { color: var(--blue); display: block; margin-bottom: 6px; }
+.campaign-mark { background: var(--navy); color: #fff; }
+
+/* ---------- Copa de secciones ---------- */
+.cup { background: var(--white); border-radius: 28px; padding: 26px 28px; margin: 0 0 28px; box-shadow: var(--shadow); }
+.cup .eyebrow { color: var(--gold); }
+.cup h2 { font-size: 24px; margin: 6px 0 2px; }
+.cup p { margin: 0 0 14px; color: var(--muted); font-size: 14px; }
+.cup-rows { display: grid; gap: 8px; }
+.cup-row { display: grid; grid-template-columns: 36px 130px 1fr 74px; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 16px; background: var(--cream); }
+.cup-row.mine { box-shadow: inset 0 0 0 2px var(--lime); background: var(--white); }
+.cup-pos { width: 32px; height: 32px; border-radius: 10px; background: var(--white); display: grid; place-items: center; font-weight: 700; color: var(--navy); }
+.cup-name { font-weight: 700; font-family: var(--font-display); }
+.cup-name small { display: block; font-size: 11px; color: var(--lime-deep); font-family: var(--font-body); }
+.cup-bar { height: 12px; background: var(--lilac); border-radius: 999px; overflow: hidden; }
+.cup-bar i { display: block; height: 100%; border-radius: inherit; min-width: 4px; transition: width .6s; }
+.cup-row b { text-align: right; color: var(--navy); font-variant-numeric: tabular-nums; }
+
+/* ---------- Formularios de moderación ---------- */
+.admin-form { display: grid; gap: 12px; margin: 6px 0 10px; }
+.admin-form label > span { display: block; font-size: 13px; font-weight: 700; margin-bottom: 6px; }
+.admin-form .primary { justify-self: start; }
+.admin-grid { display: grid; grid-template-columns: 110px 1fr; gap: 12px; }
+.admin-grid.three { grid-template-columns: repeat(3, 1fr); }
+.forgot { display: block; margin: 8px auto 0; font-size: 13px; }
+
 /* ---------- Responsive ---------- */
 @media (max-width: 1100px) {
   nav a { padding: 10px 12px; }
@@ -644,6 +672,11 @@ input[type=file]::file-selector-button {
   .polaroid { width: 190px; }
   .icon-btn { width: 38px; height: 38px; font-size: 16px; }
   .more-menu { right: -4px; }
+  .campaigns { padding: 22px 16px; }
+  .cup { padding: 22px 16px; }
+  .cup-row { grid-template-columns: 30px 1fr 64px; gap: 8px; }
+  .cup-bar { grid-column: 2 / -1; grid-row: 2; }
+  .admin-grid, .admin-grid.three { grid-template-columns: 1fr; }
 }
 
 @media (prefers-reduced-motion: reduce) {
