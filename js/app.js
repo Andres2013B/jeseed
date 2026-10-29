@@ -726,10 +726,12 @@
             <strong>${esc(c.authorName || 'Miembro')}</strong><span class="status">+${c.points} PTS</span>${c.actionId === 'custom' ? '<span class="status">ACCIÓN PROPIA</span>' : ''}
             <p><b>${esc(c.title)}</b><br>${esc(c.evidence || 'Sin descripción')}</p>
             <small>${esc(catById(c.category)?.name || '')} · aceptado ${timeAgo(c.acceptedAt)} · enviado ${timeAgo(c.completedAt)}</small>
-            <div class="review-controls">
+            ${same(c.userId, state.user.id)
+              ? '<p class="field-help">Es tu propia acción: la tiene que aprobar otro moderador.</p>'
+              : `<div class="review-controls">
               <button class="accept go" data-act="verify-ok" data-row="${esc(c.id)}">Aprobar puntos</button>
               <button class="accept" data-act="verify-no" data-row="${esc(c.id)}">Rechazar</button>
-            </div>
+            </div>`}
           </div>`).join('') : '<p class="empty-line">No hay acciones esperando verificación.</p>'}
       </section>
       <section class="review-box">

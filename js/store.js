@@ -244,7 +244,7 @@ window.Store = (() => {
       };
     }
     const mapCh = r => ({
-      id: r.id, actionId: r.action_id, category: r.category, title: r.title, points: r.points,
+      id: r.id, userId: r.user_id, actionId: r.action_id, category: r.category, title: r.title, points: r.points,
       isDaily: r.is_daily, status: r.status, acceptedAt: r.accepted_at, completedAt: r.completed_at,
       evidence: r.evidence
     });
