@@ -41,6 +41,37 @@ const SECTIONS = [
   { id: 'prepa',      name: 'Prepa',      color: '#1F9D9A' }
 ];
 
+/* Fotos fijas que aparecen primero en la galería "Jesed en acción" */
+const GALLERY_FIXED = [
+  { id: 'fx1', url: 'img/galeria/premiacion-futbol.jpg', title: 'Premiación del torneo', caption: 'Celebrando juntos: el esfuerzo en equipo también es Jesed.' },
+  { id: 'fx2', url: 'img/galeria/team-mexico.jpg', title: 'Team México · USA Cup', caption: 'Representando a nuestra comunidad con orgullo.' }
+];
+
+/* Publicaciones de EJEMPLO para la etapa de pruebas.
+   Aparecen marcadas como "Ejemplo". Para quitarlas, cambia SHOW_EXAMPLES a false. */
+const SHOW_EXAMPLES = true;
+const EXAMPLE_POSTS = [
+  { id: 'ex1', section: 'kinder',     category: 'familia',     authorName: 'Sofi',   daysAgo: 1, likes: 6,
+    content: 'Ayudé a mi mamá a poner la mesa para la cena de Shabat y acomodé las servilletas yo solita.' },
+  { id: 'ex2', section: 'kinder',     category: 'amigos',      authorName: 'Mateo',  daysAgo: 3, likes: 4,
+    content: 'Le presté mis colores a un amigo que no traía y hicimos un dibujo juntos.' },
+  { id: 'ex3', section: 'primaria',   category: 'escuela',     authorName: 'Daniela', daysAgo: 2, likes: 9,
+    content: 'En el recreo vi a una niña nueva sola y la invité a jugar con nosotras. ¡Ya somos amigas!' },
+  { id: 'ex4', section: 'primaria',   category: 'comunidad',   authorName: 'Isaac',  daysAgo: 5, likes: 7,
+    content: 'Junté con mi hermano los juguetes que ya no usamos y los llevamos a donar.' },
+  { id: 'ex5', section: 'secundaria', category: 'ayuda',       authorName: 'Ariel',  daysAgo: 1, likes: 12,
+    content: 'Le expliqué fracciones a un compañero antes del examen. Le fue muy bien y me dio las gracias.' },
+  { id: 'ex6', section: 'secundaria', category: 'familia',     authorName: 'Tamara', daysAgo: 4, likes: 8,
+    content: 'Fui a visitar a mi abuela y le enseñé a hacer videollamadas para que hable con mis primos.' },
+  { id: 'ex7', section: 'prepa',      category: 'comunidad',   authorName: 'Jonathan', daysAgo: 2, likes: 15,
+    content: 'Con mi grupo de servicio social preparamos comida para el comedor comunitario el domingo.' },
+  { id: 'ex8', section: 'prepa',      category: 'olami',       authorName: 'Raquel', daysAgo: 6, likes: 10,
+    content: 'Ayudé a organizar la actividad de Janucá para los niños de primaria: decoramos y repartimos sufganiot.' }
+].map(p => ({
+  ...p, status: 'approved', example: true, comments: 0, likedByMe: false,
+  createdAt: new Date(Date.now() - p.daysAgo * 864e5 - 3 * 36e5).toISOString()
+}));
+
 const CATEGORIES = [
   { id: 'familia',     name: 'Familia',              icon: '🏡', color: '#FF7849', desc: 'El Jesed empieza en casa.' },
   { id: 'escuela',     name: 'En la escuela',        icon: '🏫', color: '#0EA5A4', desc: 'Tu salón y tu escuela, un lugar mejor.' },

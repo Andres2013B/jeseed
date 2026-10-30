@@ -350,6 +350,7 @@ input[type=file]::file-selector-button {
   background: #f7efd7; color: #8a6c25; margin-left: 8px; letter-spacing: .5px; vertical-align: middle;
 }
 .status.approved { background: #e7f1e8; color: var(--ok); }
+.status.example { background: var(--lilac); color: var(--navy); margin-left: auto; }
 .status.rejected { background: #fbe9e3; color: var(--danger); }
 .review-controls { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
 .empty-line { font-size: 14px; color: var(--muted); }

@@ -586,17 +586,18 @@
         <span class="avatar ${p.anonymous ? 'anon' : ''}">${p.anonymous ? '✧' : esc(initial(p.authorName))}</span>
         <div><strong>${esc(p.authorName)}</strong><small>${sec ? `<i class="sec-dot" style="background:${sec.color}"></i>${esc(sec.name)} · ` : ''}${cat ? esc(cat.name) + ' · ' : ''}${timeAgo(p.createdAt)}</small></div>
         ${!approved ? `<span class="status ${p.status}">${p.status === 'pending' ? 'EN REVISIÓN' : 'NO APROBADA'}</span>` : ''}
+        ${p.example ? '<span class="status example">EJEMPLO</span>' : ''}
       </div>
       <p>${esc(p.content)}</p>
       ${p.photoUrl ? `<img class="post-photo" src="${esc(p.photoUrl)}" alt="Foto de la buena acción" loading="lazy">` : ''}
-      <div class="post-actions">
+      ${p.example ? `<div class="post-actions"><span class="like">♡ Me inspira · ${p.likes}</span></div>` : `<div class="post-actions">
         <button class="like ${p.likedByMe ? 'liked' : ''}" data-act="like" data-post="${esc(p.id)}" ${approved ? '' : 'disabled'}>♡ Me inspira · ${p.likes}</button>
         ${approved ? `<button class="like ${open ? 'on' : ''}" data-act="comments" data-post="${esc(p.id)}">💬 ${p.comments || 0}</button>
         <button class="like ${saved ? 'on' : ''}" data-act="save" data-post="${esc(p.id)}" aria-pressed="${saved}">${saved ? '★ Guardada' : '☆ Guardar'}</button>` : ''}
         ${compact ? '' : mine
           ? `<button class="mini-link" data-act="delete-post" data-post="${esc(p.id)}">Borrar</button>`
           : `<button class="mini-link" data-act="report" data-post="${esc(p.id)}" ${p.reportedByMe ? 'disabled' : ''}>${p.reportedByMe ? 'Reportada' : 'Reportar'}</button>`}
-      </div>
+      </div>`}
       ${open ? commentsHtml(p) : ''}
     </article>`;
   }
@@ -782,7 +783,7 @@
       ${doneToday ? '<span class="done-note">✓ ¡Ya cumpliste el reto de hoy! Mañana hay otro.</span>'
         : row ? `<button class="primary dark" data-act="complete" data-row="${esc(row.id)}">Ya lo hice ✓</button>`
         : `<button class="primary dark" data-act="accept" data-id="${daily.id}">Aceptar reto diario ↗</button>`}`;
-    const approved = state.posts.filter(p => p.status === 'approved').slice(0, 2);
+    const approved = [...state.posts, ...(SHOW_EXAMPLES ? EXAMPLE_POSTS : [])].filter(p => p.status === 'approved').slice(0, 2);
     $('#homePosts').innerHTML = approved.map(p => postHtml(p, true)).join('');
   }
 
@@ -812,7 +813,7 @@
     const chips = [{ id: 'todas', name: 'Todas' }, ...SECTIONS, { id: 'guardadas', name: '★ Guardadas' }];
     $('#sectionFilters').innerHTML = chips.map(c => `<button class="filter ${state.sec === c.id ? 'active' : ''}" data-act="sec" data-sec="${c.id}">${c.color ? `<i class="sec-dot" style="background:${c.color}"></i>` : ''}${esc(c.name)}</button>`).join('');
     const saved = pref('saved', []);
-    const feed = state.posts.filter(p => p.status === 'approved'
+    const feed = [...state.posts, ...(SHOW_EXAMPLES ? EXAMPLE_POSTS : [])].filter(p => p.status === 'approved'
       && (state.sec === 'todas' || (state.sec === 'guardadas' ? saved.includes(String(p.id)) : p.section === state.sec)));
     $('#feed').innerHTML = feed.length ? feed.map(p => postHtml(p)).join('')
       : `<div class="empty"><h3>${state.sec === 'guardadas' ? 'Aún no guardas publicaciones.' : 'Todavía no hay historias aquí.'}</h3><p>${state.sec === 'guardadas' ? 'Toca ☆ Guardar en las que te inspiren para tenerlas a la mano.' : 'Sé la primera persona en inspirar a la comunidad.'}</p></div>`;
@@ -1244,7 +1245,8 @@
         return { id: 'p' + p.id, url: p.photoUrl, title: p.authorName, caption: text.length > 90 ? text.slice(0, 88) + '…' : text, at: p.createdAt };
       });
     const curated = state.gallery.map(g => ({ ...g, at: g.createdAt }));
-    return [...curated, ...fromPosts].sort((a, b) => new Date(b.at) - new Date(a.at)).slice(0, 24);
+    const rest = [...curated, ...fromPosts].sort((a, b) => new Date(b.at) - new Date(a.at)).slice(0, 24);
+    return [...GALLERY_FIXED, ...rest];
   }
 
   let galleryKey = '';
