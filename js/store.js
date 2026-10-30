@@ -158,11 +158,12 @@ window.Store = (() => {
           .sort((a, b) => new Date(a.completedAt) - new Date(b.completedAt))
           .map(c => ({ ...c, photoUrl: c.photo || null, authorName: users.find(u => same(u.id, c.userId))?.name || 'Miembro' }));
       },
-      async verifyChallenge(rowId, approve) {
+      async verifyChallenge(rowId, approve, { hours = 0, date = null } = {}) {
         const all = read(K.ch, []);
         const row = all.find(c => same(c.id, rowId));
         if (!row || row.status !== 'review') throw new Error('Esta acción ya fue revisada.');
-        Object.assign(row, { status: approve ? 'completed' : 'rejected', verifiedAt: nowIso() });
+        Object.assign(row, { status: approve ? 'completed' : 'rejected', verifiedAt: nowIso() },
+          approve ? { hours: Math.min(12, Math.max(0, Number(hours) || 0)), activityDate: date || row.completedAt.slice(0, 10) } : {});
         write(K.ch, all);
       },
 
@@ -342,7 +343,8 @@ window.Store = (() => {
     const mapCh = r => ({
       id: r.id, userId: r.user_id, verifiedAt: r.verified_at, actionId: r.action_id, category: r.category, title: r.title, points: r.points,
       isDaily: r.is_daily, status: r.status, acceptedAt: r.accepted_at, completedAt: r.completed_at,
-      evidence: r.evidence, photoPath: r.photo_path
+      evidence: r.evidence, photoPath: r.photo_path,
+      hours: Number(r.hours) || 0, activityDate: r.activity_date
     });
 
     async function uploadPhoto(userId, blob, bucket = 'evidencias') {
@@ -478,9 +480,10 @@ window.Store = (() => {
         }
         return data.map(r => ({ ...mapCh(r), authorName: names[r.user_id], photoUrl: urls[r.photo_path] || null }));
       },
-      async verifyChallenge(rowId, approve) {
+      async verifyChallenge(rowId, approve, { hours = 0, date = null } = {}) {
         const { error } = await sb.from('user_challenges')
-          .update({ status: approve ? 'completed' : 'rejected' }).eq('id', rowId).eq('status', 'review');
+          .update(approve ? { status: 'completed', hours, activity_date: date } : { status: 'rejected' })
+          .eq('id', rowId).eq('status', 'review');
         fail(error);
       },
 

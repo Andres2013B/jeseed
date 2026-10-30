@@ -88,6 +88,8 @@ create table if not exists public.user_challenges (
   verified_by uuid references auth.users (id)
 );
 alter table public.user_challenges add column if not exists photo_path text;
+alter table public.user_challenges add column if not exists hours numeric(4,1) not null default 0 check (hours between 0 and 12);
+alter table public.user_challenges add column if not exists activity_date date;
 create unique index if not exists user_challenges_one_active
   on public.user_challenges (user_id, action_id) where status = 'accepted' and action_id <> 'custom';
 create index if not exists user_challenges_review on public.user_challenges (status, completed_at);
@@ -136,6 +138,8 @@ declare
   is_daily boolean := coalesce(new.is_daily, false);
   evidence text := trim(coalesce(new.evidence, ''));
   photo text := new.photo_path;
+  hrs numeric := new.hours;
+  act_date date := new.activity_date;
 begin
   -- 0) Cambios hechos directo desde el panel de Supabase (no desde la página)
   if auth.uid() is null then
@@ -151,6 +155,13 @@ begin
     new.status := next_status;
     new.verified_at := now();
     new.verified_by := auth.uid();
+    if next_status = 'completed' then
+      -- Horas y fecha las pone el moderador
+      new.hours := round(least(greatest(coalesce(hrs, 0), 0), 12) * 2) / 2;
+      new.activity_date := case
+        when act_date between current_date - 365 and current_date then act_date
+        else (old.completed_at at time zone 'America/Mexico_City')::date end;
+    end if;
     return new;
   end if;
 
