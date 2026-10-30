@@ -249,6 +249,9 @@
       }
     } catch (err) {
       errEl.textContent = err.message || 'Algo salió mal. Inténtalo de nuevo.';
+      if (/confirma tu correo/i.test(errEl.textContent)) {
+        errEl.insertAdjacentHTML('beforeend', ' <button type="button" class="text-btn" data-act="resend-confirm">Reenviar correo de confirmación ↗</button>');
+      }
     } finally { btn.disabled = false; }
   }
 
@@ -1452,6 +1455,14 @@
         }
         case 'sec': state.sec = el.dataset.sec; renderCommunity(); break;
         case 'forgot': openForgot(); break;
+        case 'resend-confirm':
+          await busy(async () => {
+            try {
+              await Store.resendConfirmation($('#authEmail').value.trim());
+              $('#authError').textContent = '📬 Te reenviamos el correo. Revisa también la carpeta de spam.';
+            } catch (err) { $('#authError').textContent = err.message; }
+          });
+          break;
         case 'menu': toggleMenu(); break;
         case 'menu-close': toggleMenu(false); break;
         case 'ideas': state.cat = 'todas'; state.q = ''; if ($('#searchInput')) $('#searchInput').value = ''; if (state.route === 'explorar') renderExplore(); break;

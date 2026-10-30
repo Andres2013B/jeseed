@@ -98,6 +98,7 @@ window.Store = (() => {
         return { user: pub(u) };
       },
       async signOut() { try { localStorage.removeItem(K.session); } catch { /* nada */ } },
+      async resendConfirmation() {},
       async resetPassword() {
         throw new Error('En el modo demo no se puede recuperar la contraseña: crea otra cuenta.');
       },
@@ -401,6 +402,10 @@ window.Store = (() => {
         return { user: await profile(data.user) };
       },
       async signOut() { await sb.auth.signOut(); },
+      async resendConfirmation(email) {
+        const { error } = await sb.auth.resend({ type: 'signup', email, options: { emailRedirectTo: location.origin + location.pathname } });
+        fail(error);
+      },
       async resetPassword(email) {
         const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: location.origin + location.pathname });
         fail(error);
