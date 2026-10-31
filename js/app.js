@@ -806,7 +806,7 @@
       : '';
     $('#activeCards').innerHTML = active.length
       ? active.map(r => actionById(r.actionId)).filter(Boolean).map(card).join('')
-      : `<div class="empty"><h3>Tu próximo gesto te está esperando.</h3><p>Elige una acción y vuelve aquí cuando la hayas realizado.</p><a class="primary" href="#explorar">Explorar acciones ↗</a></div>`;
+      : `<div class="empty"><h3>Tu próximo gesto te está esperando.</h3><p>Elige una acción y vuelve aquí cuando la hayas realizado.</p><a class="primary" href="#explorar">Ideas para ayudar ↗</a></div>`;
   }
 
   function renderCommunity() {
