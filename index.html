@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
 <style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
 <title>Maayan Jésed</title>
 <meta name="claude:viewport-fit-sides" content="cover">
@@ -254,7 +254,7 @@ body.prelogin .app,body.prelogin .spring,body.prelogin .brandbar{display:none}
 @media (min-width:900px){
  .app{max-width:1120px;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,460px);column-gap:40px;align-items:start}
  .app:has(#deckwrap[hidden]){display:block;max-width:880px}
- #deckwrap{position:sticky;top:96px}
+ #deckwrap{position:static}
  .spring .inner{max-width:1120px}
  .wcards{grid-template-columns:repeat(2,minmax(0,360px))}
  .sheet-bg{align-items:center}
@@ -478,10 +478,23 @@ body.tv #tvroot{display:block}
 .sg-x{font-size:13px;font-weight:800;color:var(--muted)}
 @media (prefers-reduced-motion:reduce){.sg-ar,.sg-hand{animation:none}}
 html.locked,html.locked body{overflow:hidden;overscroll-behavior:none}
-.sheet-bg{height:100dvh;touch-action:none}.sheet{touch-action:pan-y;max-height:min(88vh,88dvh)}
-@media (max-width:899px){.sheet{max-height:min(92vh,92dvh)}}
+.sheet{touch-action:pan-y;overflow-y:auto;max-height:min(88vh,88svh)}
+@media (max-width:899px){.sheet-bg{padding:0 10px 10px;box-sizing:border-box}.sheet{width:100%;box-sizing:border-box;border-radius:28px;max-height:calc(100svh - 74px);padding-bottom:calc(96px + env(safe-area-inset-bottom,0px))}}
 .rb>span.lbl-no{color:var(--bad,#C0392B)}.rb>span.lbl-yes{color:var(--primary)}.rb .sg-ar{font-size:15px}.lbl-no .sg-ar{display:inline-block;animation:sgl 1.4s ease-in-out infinite}.lbl-yes .sg-ar{display:inline-block;animation:sgr 1.4s ease-in-out infinite}
 .sg-hand.mid{align-self:center;margin-top:-26px;font-size:28px}
+.valok,.valno,.valwait{display:flex;align-items:center;gap:10px;border-radius:16px;padding:10px 14px;font-size:14px;line-height:1.25}
+.valok{background:var(--ok,#1F8A5B);color:#FFFFFF;box-shadow:0 4px 0 color-mix(in srgb,var(--ok,#1F8A5B) 60%,#000);animation:pop .5s cubic-bezier(.2,1.4,.4,1) both}
+.valno{background:var(--warn,#B4530F);color:#FFFFFF}
+.valwait{background:color-mix(in srgb,var(--ink) 8%,var(--surface));color:var(--muted);border:2px dashed var(--line)}
+.valok span,.valno span,.valwait span{display:flex;flex-direction:column}.valok small,.valno small{font-weight:700;opacity:.9}
+/* el celular solo se desplaza hacia arriba y abajo */
+html{overflow-x:hidden}body{overflow-x:visible!important}
+html,body{touch-action:pan-y pinch-zoom}
+.tray{touch-action:pan-x pan-y}
+.login,.landing{overflow-x:clip;max-width:100vw}
+.alertbox{display:flex;flex-direction:column;gap:3px;border:2px solid var(--warn,#B4530F);background:color-mix(in srgb,var(--warn,#B4530F) 9%,var(--surface));border-radius:14px;padding:8px 12px;font-size:13px;font-weight:700;line-height:1.3;color:var(--ink)}.alertbox b{color:var(--warn,#B4530F);display:flex;align-items:center;gap:6px;font-size:13px}
+/* iPhone hace zoom al escribir si la letra es menor a 16px: eso movía la página de lado */
+input,select,textarea,.in{font-size:16px!important}
 </style>
 
 </head>
@@ -957,7 +970,7 @@ function pool(){const fe=nextFest();let L=allR().filter(r=>stOf(r.id)==='none'&&
  if(filter==='fiesta')L=L.filter(r=>r.fest===fkey(fe));
  if(filter==='parati'){const own=L.filter(r=>!r.fest).sort((a,b)=>cur(a)-cur(b)),fest=L.filter(r=>r.fest===fkey(fe)),picks=[];['colegio','casa','rapido'].forEach(t=>{const x=own.find(r=>r.trk===t&&cur(r)===0);if(x)picks.push(x)});const k=picks.length?dayNum()%picks.length:0;L=[...picks.slice(k),...picks.slice(0,k),...own.filter(r=>!picks.includes(r))];if(fest.length){L.unshift(fest[0]);if(fest[1])L.splice(Math.min(3,L.length),0,fest[1])}}
  const a=L.filter(r=>!skipped.includes(r.id)),b=skipped.map(reto).filter(r=>r&&L.includes(r));return [...a,...b]}
-function queue(){if(S.role==='maestro')return S.subs.filter(s=>s.status==='pending'&&needVal(s)==='maestro'&&!s.val);return isAdmin()?S.subs.filter(s=>s.status==='pending'):pool()}
+function queue(){if(S.role==='maestro')return S.subs.filter(s=>s.status==='pending'&&needVal(s)==='maestro'&&!s.val);return isAdmin()?S.subs.filter(s=>s.status==='pending').sort((a,b)=>(b.val&&b.val.ok?1:0)-(a.val&&a.val.ok?1:0)):pool()}
 
 function cardHTML(r,i,first){const fe=r.fest?festOf(r):null,o=objOf(r);
  return `<article class="dcard ${fe?'festc':''} ${i===0?'front':'b'+i} ${i===0&&first?'new':''}" style="--c:${CAT[r.cat]};${fe?`--fc:${fe.c}`:''}" ${i===0?`id="front" tabindex="0" aria-label="Reto: ${esc(r.t)}. Desliza a la derecha para aceptarlo o a la izquierda para ver otro."`:'aria-hidden="true"'}>
@@ -967,12 +980,17 @@ function cardHTML(r,i,first){const fe=r.fest?festOf(r):null,o=objOf(r);
  <div class="eyebrow" style="color:var(--ink)">${CATN[r.cat]} · ${ageOf(r)}</div>
  <h2>${esc(r.t)}</h2><p>${esc(r.d)}</p><p class="objl">${ic('target',14)} ${esc(o.obj)}</p><div class="row" style="gap:8px;flex-wrap:wrap"><button class="howbtn" data-act="how" data-id="${r.id}">${ic('info',16)} Cómo hacerlo</button>${isK()?`<button class="howbtn" style="background:var(--primary);color:var(--on-primary)" data-act="speak" data-id="${r.id}">${ic('sound',16)} Escuchar</button>`:''}</div>
  <div class="meta"><span class="tag">${drop(12)} +${r.pts} ${(r.pts)===1?'gota':'gotas'}</span><span class="tag">${ic('clock',14)} ${r.min} min</span></div></article>`}
+const hace=t=>{const m=Math.max(1,Math.round((Date.now()-t)/60000));return m<60?`hace ${m} min`:m<1440?`hace ${Math.round(m/60)} h`:`hace ${Math.round(m/1440)} d`};
+function valBanner(s){const n=needVal(s);if(!n)return '';const who=n==='maestro'?'maestro':'familia';
+ if(s.val&&s.val.ok)return `<div class="valok">${ic('check',22,'#FFFFFF',3.2)}<span><b>${n==='maestro'?'Su maestro':'Su familia'} confirmó que lo vio</b><small>${esc(s.val.name||'')}${s.val.name?' · ':''}${hace(s.val.at)}</small></span></div>`;
+ if(s.val&&!s.val.ok)return `<div class="valno">${ic('x',20,'#FFFFFF',3)}<span><b>${n==='maestro'?'Su maestro':'Su familia'}: no le consta</b><small>${esc(s.val.name||'')}${s.val.name?' · ':''}${hace(s.val.at)}</small></span></div>`;
+ return `<div class="valwait">${ic('clock',18)}<span><b>Falta que lo confirme su ${who}</b></span></div>`}
 function subCardHTML(s,i,first,mode){return `<article class="dcard ${i===0?'front':'b'+i} ${i===0&&first?'new':''}" style="--c:${CAT[s.cat]}" ${i===0?`id="front" tabindex="0" aria-label="Acción por revisar: ${esc(s.title)}. Desliza a la derecha para aprobar o a la izquierda para regresarla."`:'aria-hidden="true"'}>
  ${mode==='val'?'<span class="ribbon">¿LO VISTE?</span><span class="stamp yes">LO VI</span><span class="stamp no">NO ME CONSTA</span>':'<span class="ribbon">POR REVISAR</span><span class="stamp yes">APROBAR</span><span class="stamp no">REGRESAR</span>'}
- <span class="ico">${ic(CATI[s.cat],32,'var(--ink)',2.4)}</span>
+ <span class="ico">${ic(CATI[s.cat],32,'var(--ink)',2.4)}</span>${mode!=='val'?valBanner(s):''}
  <div class="eyebrow" style="color:var(--ink)">${SEC[s.sec]} · ${CATN[s.cat]}${s.anon?' · sin nombre':''}</div>
  <h2 style="font-size:24px">${esc(s.title)}</h2>${s.photo?`<img class="dthumb" src="${s.photo}" alt="Foto de evidencia">`:''}<p>«${esc(s.text)}»</p>
- <div class="meta"><span class="tag">${drop(12)} +${s.pts} ${(s.pts)===1?'gota':'gotas'} propuestas</span>${s.photo?`<span class="tag">${ic('camera',14)} con foto</span>`:''}${mode!=='val'&&needVal(s)?`<span class="tag">${ic(s.val&&s.val.ok?'check':'clock',14)} ${valLabel(s)}</span>`:''}${mode!=='val'?(()=>{const a=aiCheck(s);return a.f.length?`<span class="tag" style="border-color:var(--warn)">${ic('spark',14)} ${a.f.length} ${a.f.length===1?'alerta':'alertas'}</span>`:''})():''}</div></article>`}
+ <div class="meta"><span class="tag">${drop(12)} +${s.pts} ${(s.pts)===1?'gota propuesta':'gotas propuestas'}</span>${s.photo?`<span class="tag">${ic('camera',14)} con foto</span>`:''}</div>${mode!=='val'?(()=>{const a=aiCheck(s);return a.f.length?`<div class="alertbox"><b>${ic('spark',14)} ${a.f.length} ${a.f.length===1?'alerta':'alertas'}</b>${a.f.map(x=>`<span>• ${esc(x)}</span>`).join('')}</div>`:''})():''}</article>`}
 
 function renderDeck(first){const deck=document.getElementById('deck'),Q=queue().slice(0,3);
  if(!Q.length){deck.innerHTML=isStaff()?`<div class="dcard front" style="--c:var(--mint)"><div class="empty">${mascot(80)}<h2 style="font-size:24px">${S.role==='maestro'?'Nada por confirmar':'Todo revisado'}</h2><p>${S.role==='maestro'?'Cuando tus alumnos cuenten retos del colegio, aparecerán aquí.':'No hay acciones por revisar. Cuando los alumnos cuenten algo, aparecerá aquí.'}</p></div></div>`:`<div class="dcard front" style="--c:var(--sky)"><div class="empty">${mascot(80)}${TRK[filter]&&lvlOf(filter)<3?nextLvlCard(filter):`<h2 style="font-size:24px">¡Ya viste todos!</h2><p>Prueba otro filtro o cuenta algo bueno que hayas hecho.</p>`}</div></div>`;
@@ -981,7 +999,7 @@ function renderDeck(first){const deck=document.getElementById('deck'),Q=queue().
  document.getElementById('deckbtns').innerHTML=S.role==='maestro'?`<div class="rb"><button class="round" data-act="no" aria-label="No me consta">${ic('x',30,'var(--bad)',3)}</button><span>No me consta</span></div><div class="rb"><button class="round yes" data-act="yes" aria-label="Lo vi">${ic('check',40,'var(--on-primary)',3.2)}</button><span>Lo vi</span></div>`:isAdmin()
   ?`<div class="rb"><button class="round" data-act="no" aria-label="Regresar al alumno con un comentario">${ic('undo',30,'var(--bad)',2.8)}</button><span>Regresar</span></div><div class="rb"><button class="round yes" data-act="yes" aria-label="Aprobar">${ic('check',40,'var(--on-primary)',3.2)}</button><span>Aprobar</span></div><div class="rb"><button class="round info" data-act="adjust" aria-label="Ajustar gotas y comentar">${ic('chat',22)}</button><span>Comentar</span></div>`
   :`<div class="rb"><button class="round" data-act="no" aria-label="Ver otra idea">${ic('x',30,'var(--bad)',3)}</button><span class="lbl-no"><b class="sg-ar">‹‹</b> Otra idea</span></div><span class="sg-hand mid" aria-hidden="true">👆</span><div class="rb"><button class="round yes" data-act="yes" aria-label="¡Lo hago! Cuéntalo">${ic('check',40,'var(--on-primary)',3.2)}</button><span class="lbl-yes">¡Lo hago! <b class="sg-ar">››</b></span></div>`;
- {const extra=S.role==='maestro'?`${queue().length} por confirmar`:isAdmin()?`${queue().length} pendientes`:'';document.getElementById('deckhint').innerHTML=`<span class="sg-t">Desliza la tarjeta o toca un botón</span>${extra?`<span class="sg-x">${extra}</span>`:''}`}
+ {const extra=S.role==='maestro'?`${queue().length} por confirmar`:isAdmin()?`${queue().length} ${queue().length===1?'pendiente':'pendientes'}${(()=>{const k=queue().filter(x=>x.val&&x.val.ok).length;return k?` · ${k} ${k===1?'confirmado':'confirmados'} por maestro o familia`:''})()}`:'';document.getElementById('deckhint').innerHTML=`<span class="sg-t">Desliza la tarjeta o toca un botón</span>${extra?`<span class="sg-x">${extra}</span>`:''}`}
  bindDrag();swipeDemo()}
 let demoDone=false;function swipeDemo(){if(demoDone)return;const el=document.getElementById('front');if(!el)return;demoDone=true;const h=document.createElement('span');h.className='swhand';h.setAttribute('aria-hidden','true');h.textContent='👆';el.appendChild(h);el.classList.add('swdemo');setTimeout(()=>{el.classList.remove('swdemo');h.remove()},2600)}
 
@@ -1209,7 +1227,7 @@ const myBand=()=>bandOfGrp(S.mySec,myGroup());
 const myAge=()=>AGES[myBand()||S.mySec];
 const fitsMe=r=>r.sec===S.mySec&&(!r.band||r.band===myBand())&&(!r.salon||r.salon===myGroup());
 const myGroup=()=>{const g=GRPS[S.mySec];return g.includes(S.grp)?S.grp:g[Math.min(3,g.length-1)]};
-function needVal(s){const r=s.rid&&reto(s.rid);return r&&r.trk==='colegio'?'maestro':r&&r.trk==='casa'?'familia':null}
+function needVal(s){const r=s.rid&&reto(s.rid);return r&&r.trk==='colegio'?'maestro':r&&(r.trk==='casa'||r.fest)?'familia':null}
 function valLabel(s){const n=needVal(s);if(!n)return '';const who=n==='maestro'?'su maestro':'su familia';if(!s.val)return `Falta que lo confirme ${who}`;return s.val.ok?`Confirmado por ${who}`:`${n==='maestro'?'Su maestro':'Su familia'}: no le consta`}
 function notify(t,sid){const id=sid||curSid();if(!id||!S.studs[id])return;const L=id===curSid()&&S.notifs?S.notifs:S.studs[id].notifs;L.push({t,at:Date.now(),read:false});if(L.length>40)L.shift()}
 const notifyMany=(t,f)=>studsAll().filter(f).forEach(a=>notify(t,a.id));
@@ -1220,9 +1238,9 @@ function aiCheck(s){const f=[],t=String(s.text||'').trim(),r=s.rid&&reto(s.rid);
  const caps=[...new Set((t.match(/[^.!?¿¡\s]\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]{2,}/g)||[]).map(x=>x.trim().split(/\s+/).pop()))].filter(w=>!OKW.includes(w));
  if(caps.length)f.push('Posibles nombres: '+caps.slice(0,3).join(', ')+'.');
  if(S.subs.some(o=>o.id!==s.id&&String(o.text).trim().toLowerCase()===t.toLowerCase()))f.push('Texto repetido de otra acción.');
- if(S.subs.filter(o=>new Date(o.at).toDateString()===new Date(s.at).toDateString()).length>5)f.push('Muchas acciones el mismo día.');
+ if(S.subs.filter(o=>o.owner===s.owner&&new Date(o.at).toDateString()===new Date(s.at).toDateString()).length>5)f.push('Muchas acciones el mismo día.');
  const n=needVal(s);if(n&&s.val&&!s.val.ok)f.push(`${n==='maestro'?'El maestro':'La familia'} indicó que no le consta.`);
- return{f,sug:r?r.pts:(t.length>120?20:10)}}
+ return{f,sug:r?r.pts:(t.length>120?2:1)}}
 function aiBox(s){const a=aiCheck(s);return `<div class="ai"><b>${ic('spark',16)} Asistente de revisión</b>${a.f.length?a.f.map(x=>`<span>• ${esc(x)}</span>`).join(''):'<span>Sin alertas: relato concreto y sin datos privados.</span>'}<span>Gotas sugeridas: <b>${a.sug}</b></span></div>`}
 function speak(t){try{if(!('speechSynthesis' in window))throw 0;const u=new SpeechSynthesisUtterance(t);u.lang='es-MX';u.rate=.92;speechSynthesis.cancel();speechSynthesis.speak(u)}catch(e){toast('Este navegador no puede leer en voz alta.')}}
 const tvFeed=()=>{const L=feed(),f=L.filter(p=>S.featured.includes(p.id));return f.length?[...f,...L.filter(p=>!S.featured.includes(p.id))]:L};
@@ -1338,7 +1356,7 @@ function famBody(fv){const n=approved().length;
  <section class="stack" style="gap:8px"><b>Sus niveles</b>${['rapido','casa','colegio'].map(lvlBox).join('')}</section>
  ${S.mySec==='Prepa'?`<section class="card stack"><b>Servicio social</b><div class="bar"><span style="width:${Math.min(100,hrsOk()/S.settings.metaHoras*100)}%"></span></div><p class="hint">${hrsOk()} de ${S.settings.metaHoras} horas confirmadas</p></section>`:''}
  <section class="card"><b>Últimas acciones</b>${S.subs.length?S.subs.slice().reverse().slice(0,8).map(s=>`<div class="hist"><p><b>${esc(s.title)}</b><br><span class="hint">${esc(valLabel(s)||(s.rid&&reto(s.rid)&&reto(s.rid).trk?TRK[reto(s.rid).trk]:'Acción propia'))}</span></p>${statusPill(s.status)}</div>`).join(''):'<p class="hint" style="margin-top:6px">Todavía no hay acciones. Propónganle un reto en familia.</p>'}</section>`;
- if(ptab==='validar')return `<p class="muted" style="font-weight:700">Retos que ${esc(S.name)} hizo en casa. Si los viste, confírmalos: así coordinación sabe que pasaron.</p>`+(fv.length?fv.map(s=>`<article class="card stack" style="gap:8px"><div class="row" style="justify-content:space-between">${catChip(s.cat)}<span class="hint">${new Date(s.at).toLocaleDateString('es-MX',{day:'numeric',month:'short'})}</span></div><b style="font-size:18px">${esc(s.title)}</b><p style="font-weight:600">«${esc(s.text)}»</p>${s.photo?`<div class="ph"><img src="${s.photo}" alt="Foto que adjuntó"></div>`:''}<div class="row"><button class="btn ghost small" style="flex:1" data-act="val" data-id="${s.id}" data-ok="0">No me consta</button><button class="btn small" style="flex:1" data-act="val" data-id="${s.id}" data-ok="1">${ic('check',18)} Sí, lo vi</button></div></article>`).join(''):emptyCard('Nada por confirmar','Cuando cuente un reto de casa, aparecerá aquí.'));
+ if(ptab==='validar')return `<p class="muted" style="font-weight:700">Retos de casa y de festividades que hizo ${esc(S.name)}. Si los viste, confírmalos: así coordinación sabe que pasaron.</p>`+(fv.length?fv.map(s=>`<article class="card stack" style="gap:8px"><div class="row" style="justify-content:space-between">${catChip(s.cat)}<span class="hint">${new Date(s.at).toLocaleDateString('es-MX',{day:'numeric',month:'short'})}</span></div><b style="font-size:18px">${esc(s.title)}</b><p style="font-weight:600">«${esc(s.text)}»</p>${s.photo?`<div class="ph"><img src="${s.photo}" alt="Foto que adjuntó"></div>`:''}<div class="row"><button class="btn ghost small" style="flex:1" data-act="val" data-id="${s.id}" data-ok="0">No me consta</button><button class="btn small" style="flex:1" data-act="val" data-id="${s.id}" data-ok="1">${ic('check',18)} Sí, lo vi</button></div></article>`).join(''):emptyCard('Nada por confirmar','Cuando cuente un reto de casa, aparecerá aquí.'));
  if(ptab==='retos'){const L=allR().filter(r=>fitsMe(r)&&r.trk==='casa'&&r.lvl<=lvlOf('casa'));return `<p class="muted" style="font-weight:700">Proponle a ${esc(S.name)} un reto para hacer juntos. Le llega directo a su bolsa.</p>`+L.map(r=>{const st=stOf(r.id);return `<article class="card stack" style="gap:6px"><div class="row" style="justify-content:space-between">${catChip(r.cat)}<span class="hint">Nivel ${r.lvl} · +${r.pts}</span></div><b style="font-size:17px">${esc(r.t)}</b><p class="hint">${esc(r.d)}</p>${st==='none'?`<button class="btn small" data-act="propose" data-id="${r.id}">Proponérselo</button>`:`<span>${st==='done'?statusPill('approved'):'<span class="status pending">En su bolsa</span>'}</span>`}</article>`}).join('')}
  if(ptab==='permisos')return `<p class="muted" style="font-weight:700">Como familia decides qué se comparte de ${esc(S.name)}. Puedes cambiarlo cuando quieras.</p><section class="card stack">${[['fotos','Puede subir fotos como evidencia'],['nombre','Su nombre puede aparecer en Comunidad'],['top','Puede aparecer en el Top 10']].map(([k,l])=>`<label class="check" for="cs-${k}"><input type="checkbox" id="cs-${k}" data-consent="${k}" ${S.consent[k]?'checked':''}> ${l}</label>`).join('')}</section><p class="hint">Los cambios se guardan al momento.</p>`;
  if(ptab==='avisos')return avisoList();return ''}
@@ -1378,7 +1396,7 @@ function adminBody(){
  <section class="card stack"><b>Accesibilidad</b><label class="check" for="st-k"><input type="checkbox" id="st-k" data-set="kinderAuto" ${st.kinderAuto?'checked':''}> Modo Kínder automático en Kínder: letra grande y lectura en voz alta</label></section>
  <section class="card stack"><b>Probar las temporadas</b><label class="f" for="simdate">Ver la app como si hoy fuera…<input class="in" id="simdate" type="date" value="${S.simDate||dayKey()}"></label><p class="hint">Solo cambia lo que ves tú en este navegador. Temporada actual: <b>${nextFest().n}</b>.</p>${S.simDate?'<button class="btn ghost small" data-act="realdate">Volver a la fecha real</button>':''}</section>`}
  if(ptab==='registro')return `<section class="card">${S.log.length?S.log.slice().reverse().map(l=>`<div class="hist"><p><b>${esc(l.title)}</b><br><span class="hint">${esc(l.comment||'Sin comentario')}${l.by?' · '+esc(l.by):''}</span></p>${l.by==='Maestro'||l.by==='Familia'?`<span class="status ${l.status==='approved'?'approved':'pending'}">${l.status==='approved'?'Confirmó':'No le consta'}</span>`:statusPill(l.status)}</div>`).join(''):'<p class="hint">Aquí queda cada aprobación, regreso y confirmación.</p>'}</section>`;return ''}
-function validate(id,ok){const s=S.subs.find(x=>x.id===id);if(!s)return;s.val={by:S.role,ok,at:Date.now()};const who=S.role==='maestro'?'Tu maestro':'Tu familia';
+function validate(id,ok){const s=S.subs.find(x=>x.id===id);if(!s)return;s.val={by:S.role,ok,at:Date.now(),name:(curAcc()||{}).name||''};const who=S.role==='maestro'?'Tu maestro':'Tu familia';
  S.log.push({title:s.title,status:ok?'approved':'rejected',comment:ok?'Confirmó que lo vio':'No le consta',by:S.role==='maestro'?'Maestro':'Familia',at:Date.now()});
  if(ok)notify(`${who} confirmó «${s.title}». Ahora lo revisa coordinación.`,s.owner);save();renderAll(true);toast(ok?'Confirmado. Ahora lo revisa coordinación.':'Anotado. Coordinación lo tomará en cuenta.')}
 
@@ -1497,7 +1515,8 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape'&&document.querySelec
 
 /* ---------- Inicio ---------- */
 function seedVisits(){}
-(async function boot(){renderAll(true);route();const ok=await DB.start();if(ok){setAccount(S.cur,true)}else{renderAll(true);if(DB.needReg())askReg()}if(DB.recovery)newPassSheet();
+(async function boot(){renderAll(true);route();const ok=await DB.start();if(ok){setAccount(S.cur,true);const SS=(()=>{try{return JSON.parse(sessionStorage.getItem('mj-sesion')||'null')}catch(e){return null}})();/* al refrescar te quedas donde estabas */if(SS){if(SS.ptab)ptab=SS.ptab;if(SS.filter)filter=SS.filter;renderAll(true);requestAnimationFrame(()=>scrollTo(0,SS.y||0))}}else{renderAll(true);if(DB.needReg())askReg()}if(DB.recovery)newPassSheet();
+ const keepSesion=()=>{try{if(S.logged)sessionStorage.setItem('mj-sesion',JSON.stringify({ptab,filter,y:lockY!==null?lockY:scrollY}));else sessionStorage.removeItem('mj-sesion')}catch(e){}};addEventListener('pagehide',keepSesion);addEventListener('beforeunload',keepSesion);document.addEventListener('visibilitychange',keepSesion);setInterval(keepSesion,2000);
  document.addEventListener('visibilitychange',()=>{if(!document.hidden&&S.logged&&DB.stale())DB.reload(true)});setInterval(()=>{if(!document.hidden&&S.logged&&!document.querySelector('.sheet'))DB.reload(true)},60000);
  storyTimer=setInterval(()=>{storyIdx++;showStory()},5000)})();
 </script>

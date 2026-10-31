@@ -180,7 +180,7 @@ begin
     new.status := old.status; new.pts := old.pts; new.data := old.data; new.photo := old.photo;
     new.show_photo := old.show_photo; new.at := old.at;
     new.val := jsonb_build_object('by', me.role, 'ok', coalesce((new.val ->> 'ok')::boolean, false),
-                                  'at', (extract(epoch from now()) * 1000)::bigint);
+                                  'at', (extract(epoch from now()) * 1000)::bigint, 'name', me.name);
     return new;
   end if;
 
