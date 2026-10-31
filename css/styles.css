@@ -619,22 +619,23 @@ input[type=file]::file-selector-button {
   transition: opacity .5s ease, visibility .5s;
 }
 .dove-intro.out { opacity: 0; visibility: hidden; }
-.dove-flight { position: absolute; left: 50%; top: 42%; width: 0; height: 0; animation: dove-path 1.6s cubic-bezier(.25,.8,.3,1) both; }
-.dove-svg { position: absolute; width: 150px; height: 150px; left: -75px; top: -75px; animation: dove-bob .5s ease-in-out 4 alternate; }
+.dove-flight { position: absolute; left: 50%; top: 42%; width: 0; height: 0; animation: dove-path 3s cubic-bezier(.3,.7,.3,1) both; }
+.dove-svg { position: absolute; width: 150px; height: 150px; left: -75px; top: -75px; animation: dove-bob .5s ease-in-out 8 alternate; }
 .dove-wing, .dove-wing-back { transform-box: view-box; transform-origin: 58px 63px; }
-.dove-wing { animation: dove-flap .22s ease-in-out 7 alternate; }
-.dove-wing-back { animation: dove-flap-back .22s ease-in-out 7 alternate; opacity: .8; }
+.dove-wing { animation: dove-flap .24s ease-in-out 13 alternate; }
+.dove-wing-back { animation: dove-flap-back .24s ease-in-out 13 alternate; opacity: .8; }
 .dove-title {
   position: absolute; left: 0; right: 0; top: calc(42% + 90px); text-align: center; opacity: 0;
-  animation: dove-title .6s ease-out 1.35s both;
+  animation: dove-title .8s ease-out 2.7s both;
 }
 .dove-title span { display: block; font-size: 13px; font-weight: 800; letter-spacing: 7px; color: var(--lime-deep); padding-left: 7px; }
 .dove-title strong { display: block; font-family: var(--font-display); font-size: 44px; font-weight: 800; letter-spacing: 1px; color: var(--navy); line-height: 1.1; }
 .dove-title small { display: block; margin-top: 8px; font-size: 14px; color: var(--muted); }
 @keyframes dove-path {
-  0%   { transform: translate(-60vw, 30vh) scale(.45) rotate(-18deg); }
-  45%  { transform: translate(-22vw, -6vh) scale(.75) rotate(-8deg); }
-  75%  { transform: translate(3vw, -3vh) scale(1.05) rotate(4deg); }
+  0%   { transform: translate(-62vw, 32vh) scale(.4) rotate(-18deg); }
+  30%  { transform: translate(-30vw, -14vh) scale(.6) rotate(-10deg); }
+  55%  { transform: translate(18vw, -20vh) scale(.8) rotate(6deg); }
+  80%  { transform: translate(10vw, 4vh) scale(1.05) rotate(10deg); }
   100% { transform: translate(0, 0) scale(1) rotate(0); }
 }
 @keyframes dove-bob { to { transform: translateY(-8px); } }

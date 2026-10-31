@@ -12,7 +12,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/styles.css?v=17">
+  <link rel="stylesheet" href="css/styles.css?v=18">
 </head>
 <body>
   <!-- Animación de entrada: la paloma llega volando (una vez por visita) -->
@@ -34,13 +34,11 @@
   <script>
     (function () {
       var el = document.getElementById('doveIntro');
-      var seen = false;
-      try { seen = sessionStorage.getItem('jesed_intro') === '1'; sessionStorage.setItem('jesed_intro', '1'); } catch (e) {}
       var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-      if (seen || reduce) { el.remove(); return; }
+      if (reduce) { el.remove(); return; }
       var done = function () { if (!el.isConnected) return; el.classList.add('out'); setTimeout(function () { el.remove(); }, 500); };
       el.addEventListener('click', done);
-      setTimeout(done, 2600);
+      setTimeout(done, 4800);
     })();
   </script>
 <div class="drawer-backdrop" data-act="menu-close" hidden></div>
@@ -248,9 +246,9 @@
   <canvas id="confetti" hidden aria-hidden="true"></canvas>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4"></script>
-  <script src="js/config.js?v=17"></script>
-  <script src="js/data.js?v=17"></script>
-  <script src="js/store.js?v=17"></script>
-  <script src="js/app.js?v=17"></script>
+  <script src="js/config.js?v=18"></script>
+  <script src="js/data.js?v=18"></script>
+  <script src="js/store.js?v=18"></script>
+  <script src="js/app.js?v=18"></script>
 </body>
 </html>
