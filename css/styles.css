@@ -620,7 +620,7 @@ input[type=file]::file-selector-button {
 }
 .dove-intro.out { opacity: 0; visibility: hidden; }
 .dove-flight { position: absolute; left: 50%; top: 42%; width: 0; height: 0; animation: dove-path 3s cubic-bezier(.3,.7,.3,1) both; }
-.dove-svg { position: absolute; width: 150px; height: 150px; left: -75px; top: -75px; animation: dove-bob .5s ease-in-out 8 alternate; }
+.dove-svg { position: absolute; width: 150px; height: 150px; left: -75px; top: -75px; animation: dove-bob .5s ease-in-out 6 alternate, dove-bob 1.4s ease-in-out 3s infinite alternate; }
 .dove-wing, .dove-wing-back { transform-box: view-box; transform-origin: 58px 63px; }
 .dove-wing { animation: dove-flap .24s ease-in-out 13 alternate; }
 .dove-wing-back { animation: dove-flap-back .24s ease-in-out 13 alternate; opacity: .8; }
