@@ -62,9 +62,10 @@ p { line-height: 1.6; }
   background: var(--white); border-right: 1px solid var(--line);
 }
 .brand { display: flex; flex-direction: column; align-items: center; }
-.brand-top { font-size: 10px; font-weight: 800; letter-spacing: 3px; color: var(--navy); }
-.brand img { display: block; width: 118px; height: 118px; object-fit: contain; margin-top: -4px; }
-.brand-sub { text-align: center; font-size: 10px; letter-spacing: 2px; color: var(--muted); margin-top: -6px; }
+.brand img { display: block; width: 96px; height: 96px; object-fit: contain; }
+.brand-top { font-size: 11px; font-weight: 800; letter-spacing: 5px; color: var(--lime-deep); margin-top: 6px; padding-left: 5px; }
+.brand-word { font-family: var(--font-display); font-size: 30px; font-weight: 800; letter-spacing: 1px; color: var(--navy); line-height: 1; }
+.brand-sub { text-align: center; font-size: 10px; letter-spacing: 2px; color: var(--muted); margin-top: 8px; }
 nav { display: grid; gap: 4px; margin-top: 26px; }
 nav a {
   display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 16px;
