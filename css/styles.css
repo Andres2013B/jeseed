@@ -207,7 +207,8 @@ main { margin: 26px auto 70px; }
 .petal:nth-child(4) { transform: rotate(180deg); }
 .petal:nth-child(5) { transform: rotate(240deg); }
 .petal:nth-child(6) { transform: rotate(300deg); }
-.flower-center { position: absolute; left: 69px; top: 79px; width: 65px; height: 65px; background: #fff; border-radius: 50%; display: grid; place-items: center; font-size: 31px; color: var(--navy); }
+.flower-center { position: absolute; left: 57px; top: 67px; width: 89px; height: 89px; background: #fff; border-radius: 50%; display: grid; place-items: center; box-shadow: 0 6px 18px #2a1c3d33; }
+.flower-center img { width: 64px; height: 64px; transform: rotate(14deg); }
 .spark { position: absolute; color: var(--lime); font-size: 34px; right: 14%; top: 14%; }
 .spark.bottom { top: auto; bottom: 14%; right: 76%; font-size: 24px; color: #fff; }
 
