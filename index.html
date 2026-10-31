@@ -877,7 +877,7 @@ const DB=(()=>{
   async start(){if(!sb){toast('No se pudo conectar con el servidor.');return false}
    try{pub=fail(await sb.rpc('mj_public_stats'))}catch(e){pub=null}
    const {data:{session}}=await sb.auth.getSession();if(!session)return false;
-   try{await load();return true}catch(e){if(isNoReg(e)){needReg=true;return false}toast(msg(e));await sb.auth.signOut();return false}},
+   for(let i=0;i<3;i++){try{await load();return true}catch(e){if(isNoReg(e)){needReg=true;return false}console.error('No se pudieron cargar los datos',e);if(i===2){toast('No pudimos cargar tus datos ('+msg(e)+'). Tu sesión sigue abierta: recarga la página.');return false}await new Promise(r=>setTimeout(r,1200*(i+1)))}}},
   publicStats:()=>pub,likes:()=>likes,
   async signIn(email,pass){const r=await sb.auth.signInWithPassword({email,password:pass});if(r.error)throw new Error(msg(r.error));try{await load()}catch(e){if(isNoReg(e)){needReg=true;throw new Error('NEEDREG')}throw e}return true},
   needReg:()=>needReg,
