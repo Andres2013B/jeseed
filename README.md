@@ -1,30 +1,22 @@
-# JESSED · Colegio Olami ORT
+# Maayan Jésed · Colegio Olami ORT
 
-Página de buenas acciones (Jesed) para alumnos del Colegio Olami ORT.
+Página de buenas acciones del Colegio Olami ORT: los alumnos eligen retos, los cuentan,
+su familia o su maestro confirman y coordinación los autoriza. Cada acción aprobada es
+una gota que llena el manantial del colegio.
 
-- Se entra con cualquier correo (para limitarlo a la escuela, pon el dominio en `SCHOOL_DOMAIN` de `js/config.js`).
-- Los retos se envían a verificación y un moderador los aprueba antes de sumar puntos.
-- Datos en Supabase (`js/config.js`). Las reglas de seguridad están en `supabase/schema.sql`.
+Publicada en: https://andres2013b.github.io/jeseed/
 
-## Funciones
-- Secciones (Kinder, Primaria, Secundaria, Prepa) y filtro en Comunidad.
-- Publicar sin nombre, comentarios, guardar publicaciones.
-- Meta semanal, avisos (🔔), menú "Más" (compartir y enviar opinión).
-- El moderador pone la fecha de la actividad al aprobar.
-- Recuperar contraseña, retos de maestros con fecha límite, ceremonia editable y Copa de secciones.
-- Galería "Jesed en acción": se llena con las fotos de las publicaciones aprobadas (y fotos extra de los moderadores).
+Creada por Andrés Braverman y Nathan Jaschkowitz.
 
-## Base de datos (Supabase → SQL Editor, en orden)
-1. `supabase/schema.sql`
-2. `supabase/02-comunidad.sql`
-3. `supabase/03-fotos.sql`
-4. `supabase/04-maestros.sql`
-5. `supabase/05-horas.sql`
+## Roles
+- **Alumno**: se registra con su correo del colegio, elige sección y salón.
+- **Familia**: se registra con su correo y el correo del colegio de su hijo o hija.
+- **Maestro**: se registra con una clave de un solo uso que genera coordinación (Personas).
+- **Coordinación**: los correos de la tabla `public.moderators` en Supabase.
 
-## Publicar
-Settings → Pages → Source: *Deploy from a branch* → Branch: `main` / `(root)` → Save.
+## Base de datos
+Supabase (el mismo proyecto de JESSED). En SQL Editor corre `supabase/maayan-jesed.sql`
+(se puede correr varias veces). Las reglas de seguridad están en ese archivo.
 
-## Cambios comunes
-- Retos y categorías: `js/data.js` (arreglo `ACTIONS`).
-- Moderadores: en Supabase → SQL Editor:
-  `insert into public.moderators (email) values ('nombre@olamiort.edu.mx');`
+## Versión anterior
+La página JESSED anterior sigue en `anterior/` (https://andres2013b.github.io/jeseed/anterior/).
