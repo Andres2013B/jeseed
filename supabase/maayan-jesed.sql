@@ -288,7 +288,8 @@ create policy "mj_settings: coordinación" on public.mj_settings for all to auth
 -- ---------------------------------------------------------- Registro
 -- Al crear la cuenta se guardan los datos del formulario; la cuenta del colegio
 -- se arma la primera vez que la persona entra (ya con su correo confirmado).
-create or replace function public.mj_finish_registration() returns public.mj_accounts
+drop function if exists public.mj_finish_registration();
+create or replace function public.mj_finish_registration(p jsonb default null) returns public.mj_accounts
 language plpgsql security definer set search_path = public as $$
 declare
   u auth.users;
@@ -302,7 +303,7 @@ begin
   if found then return acc; end if;
   select * into u from auth.users where id = auth.uid();
   if not found then raise exception 'Primero entra con tu cuenta.'; end if;
-  m := coalesce(u.raw_user_meta_data, '{}'::jsonb);
+  m := coalesce(p, u.raw_user_meta_data, '{}'::jsonb);  -- p: datos que manda la página si la cuenta ya existía
   r := coalesce(m ->> 'mj_role', '');
 
   if exists (select 1 from public.moderators where email = lower(u.email)) then
@@ -360,7 +361,7 @@ begin
 
   raise exception 'No encontramos los datos de tu registro. Crea tu cuenta otra vez.';
 end $$;
-grant execute on function public.mj_finish_registration() to authenticated;
+grant execute on function public.mj_finish_registration(jsonb) to authenticated;
 
 -- ¿Ese correo ya tiene cuenta de alumno? (para que la familia sepa si puede registrarse)
 create or replace function public.mj_student_exists(mail text) returns boolean

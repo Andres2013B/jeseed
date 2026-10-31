@@ -766,7 +766,7 @@ const MJ_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZ
 const DB=(()=>{
  const recovery=/type=recovery/.test(location.hash);
  const sb=window.supabase&&window.supabase.createClient?window.supabase.createClient(MJ_URL,MJ_KEY):null;
- let snap={},busy=Promise.resolve(),timer=null,pub=null,loadedAt=0,likes={};
+ let snap={},busy=Promise.resolve(),timer=null,pub=null,loadedAt=0,likes={},needReg=false;
  const msg=e=>{const m=String((e&&e.message)||e||'').toLowerCase();
   if(m.includes('invalid login'))return 'Correo o contraseña incorrectos.';
   if(m.includes('already registered'))return 'Ya hay una cuenta con ese correo. Usa «Ya tengo cuenta».';
@@ -836,8 +836,9 @@ const DB=(()=>{
  function schedule(){clearTimeout(timer);timer=setTimeout(()=>{busy=busy.then(flush).catch(e=>console.error(e))},250)}
 
  /* Cargar todo lo que esta persona puede ver */
- async function load(){
-  const me=fail(await sb.rpc('mj_finish_registration'));
+ const isNoReg=e=>/datos de tu registro/i.test(String((e&&e.message)||''));
+ async function load(p){
+  const me=fail(await sb.rpc('mj_finish_registration',p?{p}:{}));needReg=false;
   const [dir,accs,studs,subs,hours,notifs,items,sets]=await Promise.all([
    sb.rpc('mj_directory').then(fail),sb.from('mj_accounts').select('*').then(fail),sb.from('mj_studs').select('id,data').then(fail),
    sb.from('mj_subs').select('id,owner,status,pts,sec,val,data,photo,show_photo,at').order('at',{ascending:true}).limit(5000).then(fail),
@@ -876,12 +877,14 @@ const DB=(()=>{
   async start(){if(!sb){toast('No se pudo conectar con el servidor.');return false}
    try{pub=fail(await sb.rpc('mj_public_stats'))}catch(e){pub=null}
    const {data:{session}}=await sb.auth.getSession();if(!session)return false;
-   try{await load();return true}catch(e){toast(msg(e));await sb.auth.signOut();return false}},
+   try{await load();return true}catch(e){if(isNoReg(e)){needReg=true;return false}toast(msg(e));await sb.auth.signOut();return false}},
   publicStats:()=>pub,likes:()=>likes,
-  async signIn(email,pass){const r=await sb.auth.signInWithPassword({email,password:pass});if(r.error)throw new Error(msg(r.error));await load();return true},
+  async signIn(email,pass){const r=await sb.auth.signInWithPassword({email,password:pass});if(r.error)throw new Error(msg(r.error));try{await load()}catch(e){if(isNoReg(e)){needReg=true;throw new Error('NEEDREG')}throw e}return true},
+  needReg:()=>needReg,
+  async completeReg(meta){try{await load(meta)}catch(e){throw new Error(msg(e))}},
   async signUp(email,pass,meta){const r=await sb.auth.signUp({email,password:pass,options:{data:meta,emailRedirectTo:location.origin+location.pathname}});if(r.error)throw new Error(msg(r.error));
    if(!r.data.session)return 'confirm';try{await load();return 'ok'}catch(e){await sb.auth.signOut();throw new Error(msg(e))}},
-  async signOut(){try{await sb.auth.signOut()}catch(e){}},
+  async signOut(){needReg=false;try{await sb.auth.signOut()}catch(e){}},
   async resetPassword(email){const r=await sb.auth.resetPasswordForEmail(email,{redirectTo:location.origin+location.pathname});if(r.error)throw new Error(msg(r.error))},
   async newPassword(p){const r=await sb.auth.updateUser({password:p});if(r.error)throw new Error(msg(r.error))},
   async studentExists(mail){try{return fail(await sb.rpc('mj_student_exists',{mail}))}catch(e){return true}},
@@ -1248,16 +1251,16 @@ function renderLogin(){const el=document.getElementById('login');document.body.c
 ].map(([i,t,d,e],k)=>`<li style="--d:${k*0.9}s"><span class="fl-ic">${i==='drop'?drop(30,'var(--water)'):ic(i,28,'var(--primary)')}<i>${k+1}</i></span><div><b>${t}</b><p>${d}</p></div></li>`).join('')}</ol></section>
  <section class="ld-marquee" aria-label="Retos de temporada todo el año"><div class="ld-track">${[...uniqFest(),...uniqFest()].map(f=>`<span style="--fc:${f.c}">${ic('spark',14,'#FFFFFF')} ${f.n}</span>`).join('')}</div></section>
  <p class="ld-priv">${ic('shield',18,'var(--primary)')} La familia decide qué se comparte y todo lo revisa el colegio.</p>
- <section class="ld-sec" id="registro"><form class="card stack ld-form" id="freg"><h2>Crea tu cuenta</h2><p class="muted" style="font-weight:700">Súmate en un minuto.</p>
+ <section class="ld-sec" id="registro"><form class="card stack ld-form" id="freg"><h2>${DB.needReg()?'Termina tu registro':'Crea tu cuenta'}</h2><p class="muted" style="font-weight:700">${DB.needReg()?'Ya entraste con tu correo. Elige tu rol y completa tus datos.':'Súmate en un minuto.'}</p>${DB.needReg()?'<button type="button" class="linkbtn" data-act="logout" style="align-self:flex-start">Usar otro correo</button>':''}
  <div class="seg" role="group" aria-label="Soy">${[['alumno','Alumno'],['familia','Familia'],['maestro','Maestro']].map(([k,l])=>`<button type="button" class="${reg===k?'on':''}" data-act="regrole" data-id="${k}" aria-pressed="${reg===k}">${l}</button>`).join('')}</div>
  <label class="f" for="rg-name">${reg==='familia'?'Tu nombre':'Nombre completo'}<input class="in" id="rg-name" required maxlength="60" autocomplete="name"></label>
  ${reg==='familia'?'<label class="f" for="rg-kidmail">Correo del colegio de tu hijo o hija<input class="in" id="rg-kidmail" type="email" required placeholder="nombre@olamiort.edu.mx"></label><p class="hint">Así tu cuenta queda ligada a la de tu hijo y solo verás su información.</p>':''}
- <label class="f" for="rg-mail">${reg==='familia'?'Tu correo':'Correo del colegio'}<input class="in" id="rg-mail" type="email" required placeholder="${reg==='familia'?'tu@correo.com':'nombre@olamiort.edu.mx'}" autocomplete="email"></label><label class="f" for="rg-pass">Crea una contraseña<input class="in" id="rg-pass" type="password" required minlength="6" autocomplete="new-password" placeholder="Mínimo 6 caracteres"></label>
+ ${DB.needReg()?'':`<label class="f" for="rg-mail">${reg==='familia'?'Tu correo':'Correo del colegio'}<input class="in" id="rg-mail" type="email" required placeholder="${reg==='familia'?'tu@correo.com':'nombre@olamiort.edu.mx'}" autocomplete="email"></label><label class="f" for="rg-pass">Crea una contraseña<input class="in" id="rg-pass" type="password" required minlength="6" autocomplete="new-password" placeholder="Mínimo 6 caracteres"></label>`}
  ${reg==='maestro'?'<label class="f" for="rg-code">Clave de maestro<input class="in" id="rg-code" required placeholder="MJ-2C-K7P4QX" autocapitalize="characters" autocomplete="off"></label><p class="hint">Te la da coordinación. Con ella tu cuenta queda activa y ligada a tu salón.</p>':''}${reg!=='alumno'?'':`<div class="row"><label class="f" for="rg-sec" style="flex:1;min-width:0">Sección<select class="in" id="rg-sec">${SECS.map(x=>`<option value="${x}" ${sec===x?'selected':''}>${SEC[x]}</option>`).join('')}</select></label><label class="f" for="rg-grp" style="flex:1;min-width:0">Grupo<select class="in" id="rg-grp">${GRPS[sec].map(g=>`<option>${g}</option>`).join('')}</select></label></div><p class="hint">${reg==='maestro'?'Serás el maestro de este salón. Sus alumnos quedan ligados a ti automáticamente.':'Te ligamos con el maestro de tu salón y te mostramos retos para tu edad.'}</p>`}
  <label class="check" for="rg-ok"><input type="checkbox" id="rg-ok" required> Acepto el aviso de privacidad del colegio.</label>
  ${reg==='familia'?'<label class="check" for="rg-ok2"><input type="checkbox" id="rg-ok2" required> Autorizo que mi hijo o hija participe en Maayan Jésed.</label>':''}
  
- <button class="btn full">Crear cuenta</button><p class="hint">Las cuentas de coordinación las da de alta el colegio.</p></form></section>
+ <button class="btn full">${DB.needReg()?'Terminar registro':'Crear cuenta'}</button><p class="hint">Las cuentas de coordinación las da de alta el colegio.</p></form></section>
  <footer class="ld-foot">${logo(26)} maayan jésed · Colegio Olami ORT</footer></div>`;
  if(!matchMedia('(prefers-reduced-motion: reduce)').matches)el.querySelectorAll('.ld-count').forEach(c=>{const to=+c.dataset.to,t0=performance.now();(function f(t){const k=Math.min(1,(t-t0)/1400);c.textContent=nf(Math.round(to*(1-Math.pow(1-k,3))));if(k<1)requestAnimationFrame(f)})(t0)})}
 function stepArt(k){if(k==='swipe')return `<span class="m-card back"></span><span class="m-card top">${ic('heart',20,'#FFFFFF',2.6)}</span>`;if(k==='check')return `<svg viewBox="0 0 60 60" width="66" height="66"><circle cx="30" cy="30" r="25" fill="var(--mint)"></circle><path class="chk" d="M18 31l8 8 16-17" fill="none" stroke="#2A1F3D" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"></path></svg>`;if(k==='chat')return `<span class="m-bub"><i></i><i></i><i></i></span>`;return `<span class="m-fall">${drop(20,'var(--water)')}</span><span class="m-pool"></span><span class="m-ring"></span>`}
@@ -1265,16 +1268,17 @@ function accDetail(a){return a.role==='alumno'?`${SEC[a.sec]} · ${a.grp}`:a.rol
 function haveSheet(){sheet(`<div class="eyebrow">Entrar</div><h2 style="font-size:26px">Ya tengo cuenta</h2><form class="stack" id="flogin"><label class="f" for="lg-mail">Correo<input class="in" id="lg-mail" type="email" required autocomplete="email" placeholder="nombre@olamiort.edu.mx"></label><label class="f" for="lg-pass">Contraseña<input class="in" id="lg-pass" type="password" required autocomplete="current-password" minlength="6"></label><p class="hint" id="lg-err" role="alert" style="color:var(--bad)"></p><button class="btn full">Entrar</button></form>
  <button class="linkbtn" data-act="forgot">¿Olvidaste tu contraseña?</button>
  <p class="hint">Cada cuenta tiene un solo rol (alumno, familia, maestro o coordinación) y no se puede cambiar.</p>`)}
+function askReg(){renderLogin();const r=document.getElementById('registro');if(r)r.scrollIntoView({block:'start'});toast('Ya entraste. Completa tus datos para terminar tu registro.')}
 function forgotSheet(){const m=((document.getElementById('lg-mail')||{}).value||'').trim();sheet(`<div class="eyebrow">Recuperar acceso</div><h2 style="font-size:26px">¿Olvidaste tu contraseña?</h2><p class="muted" style="font-weight:700">Escribe tu correo y te mandamos un link para crear una nueva.</p><form class="stack" id="fforgot"><label class="f" for="fg-mail">Correo<input class="in" id="fg-mail" type="email" required autocomplete="email" value="${esc(m)}"></label><p class="hint" id="fg-err" role="alert" style="color:var(--bad)"></p><button class="btn full">Mandar link</button></form><button class="linkbtn" data-act="haveacc">Volver a entrar</button>`)}
 function newPassSheet(){sheet(`<div class="eyebrow">Nueva contraseña</div><h2 style="font-size:26px">Crea tu nueva contraseña</h2><form class="stack" id="fnewpass"><label class="f" for="np-1">Nueva contraseña<input class="in" id="np-1" type="password" required minlength="6" autocomplete="new-password"></label><label class="f" for="np-2">Repítela<input class="in" id="np-2" type="password" required minlength="6" autocomplete="new-password"></label><p class="hint" id="np-err" role="alert" style="color:var(--bad)"></p><button class="btn full">Guardar contraseña</button></form>`)}
 async function register(){const v=k=>{const x=document.getElementById(k);return x?x.value.trim():''},r=renderLogin.r||'alumno',sec=v('rg-sec')||'Primaria',grp=v('rg-grp'),mail=v('rg-mail').toLowerCase(),pass=(document.getElementById('rg-pass')||{}).value||'',btn=document.querySelector('#freg button.btn.full');
- if(pass.length<6){toast('La contraseña debe tener al menos 6 caracteres.');return}
+ if(!DB.needReg()&&pass.length<6){toast('La contraseña debe tener al menos 6 caracteres.');return}
  const meta={mj_role:r,mj_name:v('rg-name')};
  if(r==='alumno')Object.assign(meta,{mj_sec:sec,mj_grp:grp});
  if(r==='familia'){const km=v('rg-kidmail').toLowerCase();if(!(await DB.studentExists(km))){toast('No encontramos a ese alumno. Pídele que se registre primero con su correo del colegio.');return}meta.mj_kid=km}
  if(r==='maestro'){const code=v('rg-code').toUpperCase().replace(/\s+/g,'');if(!(await DB.codeOk(code))){toast('Esa clave no es válida o ya se usó. Pídela a coordinación.');return}meta.mj_code=code}
  if(btn)btn.disabled=true;
- try{const res=await DB.signUp(mail,pass,meta);
+ try{const res=DB.needReg()?(await DB.completeReg(meta),'ok'):await DB.signUp(mail,pass,meta);
   if(res==='confirm'){sheet(`<div class="eyebrow">Revisa tu correo</div><h2 style="font-size:26px">📬 Confirma tu cuenta</h2><p class="muted" style="font-weight:700">Te mandamos un correo a <b>${esc(mail)}</b>. Ábrelo, toca el link y después entra con «Ya tengo cuenta». Revisa también la carpeta de spam.</p><button class="btn full" data-act="haveacc">Ya lo confirmé: entrar</button>`);return}
   setAccount(S.cur);const a=curAcc();
   if(a.role==='alumno'){const t=teacherOf(a.sec,a.grp);toast(t?`¡Bienvenido! Quedaste en ${a.grp} con ${t.name}.`:`¡Bienvenido! Quedaste en ${a.grp}. Tu salón aún no tiene maestro registrado.`)}
@@ -1471,7 +1475,7 @@ document.addEventListener('change',e=>{const dt=e.target.dataset||{};
  if(e.target.id==='kmode'){S.kinder=e.target.checked;save();closeSheet();renderAll();toast(S.kinder?'Modo Kínder activado.':'Modo Kínder desactivado.');return}
  if(e.target.id==='d-photo'&&e.target.files&&e.target.files[0])readPhoto(e.target.files[0]);if(e.target.id==='mysec'){S.mySec=e.target.value;skipped=[];save();renderAll(true);toast('Ahora ves retos de '+SEC[S.mySec]+'.')}});
 document.addEventListener('submit',async e=>{e.preventDefault();
- if(e.target.id==='flogin'){const m=document.getElementById('lg-mail').value.trim().toLowerCase(),p=document.getElementById('lg-pass').value,er=document.getElementById('lg-err'),b=e.target.querySelector('button');b.disabled=true;er.textContent='';try{await DB.signIn(m,p);setAccount(S.cur)}catch(x){er.textContent=x.message}finally{b.disabled=false}return}
+ if(e.target.id==='flogin'){const m=document.getElementById('lg-mail').value.trim().toLowerCase(),p=document.getElementById('lg-pass').value,er=document.getElementById('lg-err'),b=e.target.querySelector('button');b.disabled=true;er.textContent='';try{await DB.signIn(m,p);setAccount(S.cur)}catch(x){if(x.message==='NEEDREG'){closeSheet();askReg()}else er.textContent=x.message}finally{b.disabled=false}return}
  if(e.target.id==='fforgot'){const m=document.getElementById('fg-mail').value.trim().toLowerCase(),er=document.getElementById('fg-err');try{await DB.resetPassword(m);sheet(`<div class="eyebrow">Revisa tu correo</div><h2 style="font-size:26px">📬 Te mandamos un link</h2><p class="muted" style="font-weight:700">Si <b>${esc(m)}</b> tiene cuenta, te llegará un correo para crear una contraseña nueva. Revisa también spam.</p><button class="btn full" data-act="close">Entendido</button>`)}catch(x){er.textContent=x.message}return}
  if(e.target.id==='fnewpass'){const a=document.getElementById('np-1').value,b2=document.getElementById('np-2').value,er=document.getElementById('np-err');if(a!==b2){er.textContent='Las contraseñas no coinciden.';return}try{await DB.newPassword(a);history.replaceState(null,'',location.pathname);closeSheet();toast('¡Listo! Tu contraseña se cambió.');if(!S.logged&&await DB.start())setAccount(S.cur)}catch(x){er.textContent=x.message}return}
  if(e.target.id==='finv'){const [sc,gr]=document.getElementById('iv-s').value.split('|');if(teacherOf(sc,gr)){toast(`${gr} de ${SEC[sc]} ya tiene maestro.`);return}const AB='ABCDEFGHJKLMNPQRSTUVWXYZ23456789',rnd=[...crypto.getRandomValues(new Uint8Array(6))].map(b=>AB[b%AB.length]).join(''),code='MJ-'+gr.replace(/[^0-9A-Za-z]/g,'').replace('º','').toUpperCase()+'-'+rnd;S.invites.push({code,sec:sc,grp:gr,used:null,at:Date.now()});S.log.push({title:'Clave de maestro creada',status:'approved',comment:code+' · '+SEC[sc]+' '+gr,by:'Coordinación',at:Date.now()});save();renderAll();toast('Clave creada: '+code)}
@@ -1493,7 +1497,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape'&&document.querySelec
 
 /* ---------- Inicio ---------- */
 function seedVisits(){}
-(async function boot(){renderAll(true);route();const ok=await DB.start();if(ok){setAccount(S.cur,true)}else renderAll(true);if(DB.recovery)newPassSheet();
+(async function boot(){renderAll(true);route();const ok=await DB.start();if(ok){setAccount(S.cur,true)}else{renderAll(true);if(DB.needReg())askReg()}if(DB.recovery)newPassSheet();
  document.addEventListener('visibilitychange',()=>{if(!document.hidden&&S.logged&&DB.stale())DB.reload(true)});setInterval(()=>{if(!document.hidden&&S.logged&&!document.querySelector('.sheet'))DB.reload(true)},60000);
  storyTimer=setInterval(()=>{storyIdx++;showStory()},5000)})();
 </script>
