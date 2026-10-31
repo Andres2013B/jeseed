@@ -631,6 +631,11 @@ input[type=file]::file-selector-button {
 .dove-title span { display: block; font-size: 13px; font-weight: 800; letter-spacing: 7px; color: var(--lime-deep); padding-left: 7px; }
 .dove-title strong { display: block; font-family: var(--font-display); font-size: 44px; font-weight: 800; letter-spacing: 1px; color: var(--navy); line-height: 1.1; }
 .dove-title small { display: block; margin-top: 8px; font-size: 14px; color: var(--muted); }
+.dove-credit {
+  display: inline-block; margin-top: 22px; padding: 8px 16px; border-radius: 999px; background: var(--white); box-shadow: var(--shadow);
+  font-style: normal; font-size: 13px; font-weight: 700; color: var(--navy); opacity: 0; animation: dove-title .8s ease-out 3.6s both;
+  max-width: calc(100% - 40px); line-height: 1.4;
+}
 @keyframes dove-path {
   0%   { transform: translate(-62vw, 32vh) scale(.4) rotate(-18deg); }
   30%  { transform: translate(-30vw, -14vh) scale(.6) rotate(-10deg); }
