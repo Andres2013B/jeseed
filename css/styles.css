@@ -612,6 +612,36 @@ input[type=file]::file-selector-button {
 .admin-grid.three { grid-template-columns: repeat(3, 1fr); }
 .forgot { display: block; margin: 8px auto 0; font-size: 13px; }
 
+/* ---------- Animación de entrada: la paloma llega volando ---------- */
+.dove-intro {
+  position: fixed; inset: 0; z-index: 1000; display: grid; place-items: center; cursor: pointer;
+  background: radial-gradient(600px 400px at 50% 45%, #a6d45c22, transparent 70%), var(--cream);
+  transition: opacity .5s ease, visibility .5s;
+}
+.dove-intro.out { opacity: 0; visibility: hidden; }
+.dove-flight { position: absolute; left: 50%; top: 42%; width: 0; height: 0; animation: dove-path 1.6s cubic-bezier(.25,.8,.3,1) both; }
+.dove-svg { position: absolute; width: 150px; height: 150px; left: -75px; top: -75px; animation: dove-bob .5s ease-in-out 4 alternate; }
+.dove-wing, .dove-wing-back { transform-box: view-box; transform-origin: 58px 63px; }
+.dove-wing { animation: dove-flap .22s ease-in-out 7 alternate; }
+.dove-wing-back { animation: dove-flap-back .22s ease-in-out 7 alternate; opacity: .8; }
+.dove-title {
+  position: absolute; left: 0; right: 0; top: calc(42% + 90px); text-align: center; opacity: 0;
+  animation: dove-title .6s ease-out 1.35s both;
+}
+.dove-title span { display: block; font-size: 13px; font-weight: 800; letter-spacing: 7px; color: var(--lime-deep); padding-left: 7px; }
+.dove-title strong { display: block; font-family: var(--font-display); font-size: 44px; font-weight: 800; letter-spacing: 1px; color: var(--navy); line-height: 1.1; }
+.dove-title small { display: block; margin-top: 8px; font-size: 14px; color: var(--muted); }
+@keyframes dove-path {
+  0%   { transform: translate(-60vw, 30vh) scale(.45) rotate(-18deg); }
+  45%  { transform: translate(-22vw, -6vh) scale(.75) rotate(-8deg); }
+  75%  { transform: translate(3vw, -3vh) scale(1.05) rotate(4deg); }
+  100% { transform: translate(0, 0) scale(1) rotate(0); }
+}
+@keyframes dove-bob { to { transform: translateY(-8px); } }
+@keyframes dove-flap { from { transform: scaleY(1); } to { transform: scaleY(-.55) skewX(-10deg); } }
+@keyframes dove-flap-back { from { transform: scaleY(.6) rotate(-14deg); } to { transform: scaleY(-.35) rotate(-6deg); } }
+@keyframes dove-title { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+
 /* ---------- Responsive ---------- */
 @media (max-width: 1100px) {
   .stats { grid-template-columns: repeat(2, 1fr); }
@@ -670,6 +700,9 @@ input[type=file]::file-selector-button {
   .flower { transform: scale(.65) rotate(-14deg); animation: none; }
   .hero-art { opacity: 1; right: -18px; bottom: -14px; }
   .hero-logo { width: 120px; height: 120px; animation: none; }
+  .dove-svg { width: 120px; height: 120px; left: -60px; top: -60px; }
+  .dove-title { top: calc(42% + 74px); }
+  .dove-title strong { font-size: 36px; }
   .hero-logo img { width: 86px; height: 86px; }
   .orbit { width: 200px; height: 200px; }
   .orbit.two { width: 280px; height: 280px; }

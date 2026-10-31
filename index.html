@@ -12,9 +12,37 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/styles.css?v=16">
+  <link rel="stylesheet" href="css/styles.css?v=17">
 </head>
 <body>
+  <!-- Animación de entrada: la paloma llega volando (una vez por visita) -->
+  <div class="dove-intro" id="doveIntro" aria-hidden="true">
+    <div class="dove-flight">
+      <svg class="dove-svg" viewBox="0 0 120 120">
+        <g class="dove-wing-back"><path d="M50 64 Q48 32 76 12 Q86 40 66 62Z" fill="#7fae36"/></g>
+        <path d="M10 74 Q30 60 52 64 Q72 50 92 44 Q104 40 106 50 Q102 56 94 58 Q92 86 62 94 Q34 100 18 86 Q30 84 34 80 Q20 82 10 74Z" fill="#513579"/>
+        <g class="dove-wing"><path d="M50 64 Q48 32 76 12 Q86 40 66 62Z" fill="#a6d45c"/><path d="M60 62 Q60 42 74 28" stroke="#7fae36" stroke-width="3" fill="none" stroke-linecap="round"/></g>
+        <circle cx="96" cy="49" r="3" fill="#ffffff"/>
+        <path d="M105 48 L116 52 L104 55Z" fill="#a6d45c"/>
+        <path d="M110 54 Q108 66 98 72" stroke="#7fae36" stroke-width="3" fill="none" stroke-linecap="round"/>
+        <ellipse cx="106" cy="64" rx="5" ry="3" fill="#a6d45c" transform="rotate(-50 106 64)"/>
+        <ellipse cx="100" cy="71" rx="5" ry="3" fill="#a6d45c" transform="rotate(-20 100 71)"/>
+      </svg>
+    </div>
+    <div class="dove-title"><span>MAAYAN</span><strong>JESSED</strong><small>Pequeñas acciones, grandes cambios</small></div>
+  </div>
+  <script>
+    (function () {
+      var el = document.getElementById('doveIntro');
+      var seen = false;
+      try { seen = sessionStorage.getItem('jesed_intro') === '1'; sessionStorage.setItem('jesed_intro', '1'); } catch (e) {}
+      var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      if (seen || reduce) { el.remove(); return; }
+      var done = function () { if (!el.isConnected) return; el.classList.add('out'); setTimeout(function () { el.remove(); }, 500); };
+      el.addEventListener('click', done);
+      setTimeout(done, 2600);
+    })();
+  </script>
 <div class="drawer-backdrop" data-act="menu-close" hidden></div>
   <aside class="sidebar" id="sidebar">
     <a class="brand" href="#inicio" aria-label="Maayan Jessed, inicio">
@@ -220,9 +248,9 @@
   <canvas id="confetti" hidden aria-hidden="true"></canvas>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4"></script>
-  <script src="js/config.js?v=16"></script>
-  <script src="js/data.js?v=16"></script>
-  <script src="js/store.js?v=16"></script>
-  <script src="js/app.js?v=16"></script>
+  <script src="js/config.js?v=17"></script>
+  <script src="js/data.js?v=17"></script>
+  <script src="js/store.js?v=17"></script>
+  <script src="js/app.js?v=17"></script>
 </body>
 </html>
