@@ -209,6 +209,12 @@ main { margin: 26px auto 70px; }
 .petal:nth-child(6) { transform: rotate(300deg); }
 .flower-center { position: absolute; left: 57px; top: 67px; width: 89px; height: 89px; background: #fff; border-radius: 50%; display: grid; place-items: center; box-shadow: 0 6px 18px #2a1c3d33; }
 .flower-center img { width: 64px; height: 64px; transform: rotate(14deg); }
+.hero-logo {
+  position: relative; width: 190px; height: 190px; border-radius: 50%; background: #fff; display: grid; place-items: center;
+  box-shadow: 0 18px 40px #2a1c3d55; animation: float 6s ease-in-out infinite;
+}
+.hero-logo img { width: 140px; height: 140px; }
+@keyframes float { 50% { transform: translateY(-8px); } }
 .spark { position: absolute; color: var(--lime); font-size: 34px; right: 14%; top: 14%; }
 .spark.bottom { top: auto; bottom: 14%; right: 76%; font-size: 24px; color: #fff; }
 
@@ -662,6 +668,9 @@ input[type=file]::file-selector-button {
   .hero p { max-width: 250px; font-size: 15px; }
   .hero-art { width: 170px; height: 170px; right: -30px; top: auto; bottom: -26px; opacity: .55; }
   .flower { transform: scale(.65) rotate(-14deg); animation: none; }
+  .hero-art { opacity: 1; right: -18px; bottom: -14px; }
+  .hero-logo { width: 120px; height: 120px; animation: none; }
+  .hero-logo img { width: 86px; height: 86px; }
   .orbit { width: 200px; height: 200px; }
   .orbit.two { width: 280px; height: 280px; }
   .stats { gap: 8px; grid-template-columns: repeat(2, 1fr); }
