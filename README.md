@@ -10,7 +10,7 @@ Página de buenas acciones (Jesed) para alumnos del Colegio Olami ORT.
 - Secciones (Kinder, Primaria, Secundaria, Prepa) y filtro en Comunidad.
 - Publicar sin nombre, comentarios, guardar publicaciones.
 - Meta semanal, avisos (🔔), menú "Más" (compartir y enviar opinión).
-- Horas de servicio social: el moderador pone fecha y horas al aprobar.
+- El moderador pone la fecha de la actividad al aprobar.
 - Recuperar contraseña, retos de maestros con fecha límite, ceremonia editable y Copa de secciones.
 - Galería "Jesed en acción": se llena con las fotos de las publicaciones aprobadas (y fotos extra de los moderadores).
 

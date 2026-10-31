@@ -45,7 +45,6 @@
   const firstName = name => String(name || '').trim().split(/\s+/)[0];
   const same = (a, b) => String(a) === String(b);
   const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
-  const fmtHours = h => `${String(Number(h) || 0).replace('.', ',')} h`;
   const localDay = iso => { const d = new Date(iso); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
   const secById = id => SECTIONS.find(s => s.id === id);
 
@@ -83,8 +82,7 @@
       bestStreak = Math.max(bestStreak, run);
       prev = cur;
     });
-    const hours = Math.round(done.reduce((s, c) => s + (Number(c.hours) || 0), 0) * 10) / 10;
-    return { done, active, points, byCat, streak, bestStreak, hours, dailyCount: done.filter(c => c.isDaily).length };
+    return { done, active, points, byCat, streak, bestStreak, dailyCount: done.filter(c => c.isDaily).length };
   }
 
   function levelInfo(points) {
@@ -495,7 +493,6 @@
     return `<div class="stats">
       <div class="stat"><span class="stat-icon">✧</span><div><strong>${s.points}</strong><small>Puntos de bondad</small></div></div>
       <div class="stat"><span class="stat-icon">♡</span><div><strong>${s.done.length}</strong><small>Acciones completadas</small></div></div>
-      <div class="stat"><span class="stat-icon">⏱</span><div><strong>${fmtHours(s.hours)}</strong><small>Horas de servicio</small></div></div>
       <div class="stat"><span class="stat-icon">☀</span><div><strong>${earned} / ${BADGES.length}</strong><small>Insignias desbloqueadas</small></div></div>
     </div>`;
   }
@@ -859,7 +856,7 @@
       </div>
       <div class="profile-summary">
         <div><div class="eyebrow">TU ACTIVIDAD</div><h3>🔥 ${plural(s.streak, 'día', 'días')} de racha</h3>
-        <p>⏱ ${fmtHours(s.hours)} de servicio social · ${s.points} puntos · ${plural(s.done.length, 'acción completada', 'acciones completadas')} · ${plural(inReview.length, 'acción por verificar', 'acciones por verificar')} · ${pending} publicaciones en revisión</p></div>
+        <p>${s.points} puntos · ${plural(s.done.length, 'acción completada', 'acciones completadas')} · ${plural(inReview.length, 'acción por verificar', 'acciones por verificar')} · ${pending} publicaciones en revisión</p></div>
         <button class="primary" data-act="go-form">Registrar mi acción <span>↗</span></button>
       </div>`;
     body.innerHTML = `
@@ -871,7 +868,7 @@
         <div class="history-row"><span>${h.status === 'review' ? '⏳' : '✕'} ${esc(h.title)}<small>${fmtDate(h.completedAt)} · ${h.status === 'review' ? 'Un responsable la está revisando' : 'No fue aprobada'}</small></span><span>${h.status === 'review' ? `+${h.points} por confirmar` : '0 puntos'}</span></div>`).join('')}</div>` : ''}
       <h2 class="subhead">Tu historia de buenas acciones</h2>
       <div class="history">${s.done.length ? s.done.map(h => `
-        <div class="history-row"><span>✓ ${esc(h.title)}<small>${h.activityDate ? fmtDay(h.activityDate) : fmtDate(h.completedAt)}${h.hours ? ` · ⏱ ${fmtHours(h.hours)}` : ''}${h.isDaily ? ' · Reto de hoy' : ''}${h.actionId === 'custom' ? ' · Acción propia' : ''}</small></span><span>+${h.points} puntos</span></div>`).join('')
+        <div class="history-row"><span>✓ ${esc(h.title)}<small>${h.activityDate ? fmtDay(h.activityDate) : fmtDate(h.completedAt)}${h.isDaily ? ' · Reto de hoy' : ''}${h.actionId === 'custom' ? ' · Acción propia' : ''}</small></span><span>+${h.points} puntos</span></div>`).join('')
         : '<p class="empty-line">Tu historia empieza con tu primera acción.</p>'}</div>
       ${Store.mode === 'local' ? '<div class="notice">Modo demo: tu cuenta y tu progreso se guardan únicamente en este navegador. Conecta la base de datos para cuentas reales.</div>' : ''}`;
   }
@@ -897,10 +894,9 @@
               ? '<p class="field-help">Es tu propia acción: la tiene que aprobar otro moderador.</p>'
               : `<div class="verify-fields">
                 <label>📅 Fecha de la actividad<input class="search" type="date" id="vdate-${esc(c.id)}" value="${localDay(c.completedAt)}" max="${localDay(new Date())}"></label>
-                <label>⏱ Horas de servicio<input class="search" type="number" id="vhours-${esc(c.id)}" value="1" min="0" max="12" step="0.5" inputmode="decimal"></label>
               </div>
               <div class="review-controls">
-              <button class="accept go" data-act="verify-ok" data-row="${esc(c.id)}">Aprobar puntos y horas</button>
+              <button class="accept go" data-act="verify-ok" data-row="${esc(c.id)}">Aprobar puntos</button>
               <button class="accept" data-act="verify-no" data-row="${esc(c.id)}">Rechazar</button>
             </div>`}
           </div>`).join('') : '<p class="empty-line">No hay acciones esperando verificación.</p>'}
@@ -1059,15 +1055,13 @@
   async function verify(rowId, approve) {
     let extra = {};
     if (approve) {
-      const hours = Number(String($(`#vhours-${CSS.escape(rowId)}`)?.value || '0').replace(',', '.'));
       const date = $(`#vdate-${CSS.escape(rowId)}`)?.value || null;
-      if (!(hours >= 0 && hours <= 12)) { toast('Las horas deben ser entre 0 y 12.', 'error'); return; }
       if (!date || date > localDay(new Date())) { toast('Elige una fecha que no sea en el futuro.', 'error'); return; }
-      extra = { hours: Math.round(hours * 2) / 2, date };
+      extra = { date };
     }
     try {
       await Store.verifyChallenge(rowId, approve, extra);
-      toast(approve ? `Aprobada ✓ ${fmtHours(extra.hours)} de servicio` : 'Acción rechazada.');
+      toast(approve ? 'Puntos aprobados ✓' : 'Acción rechazada.');
       await loadUserData();
       renderAdmin();
     } catch (e) { toast(e.message, 'error'); }
