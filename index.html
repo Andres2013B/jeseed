@@ -834,7 +834,10 @@ const DB=(()=>{
   if(t==='item')return fail(await sb.from('mj_items').delete().eq('kind',a).eq('id',k.slice(t.length+a.length+2)));
   if(t==='inv')return fail(await sb.from('mj_invites').delete().eq('code',a))}
 
- async function flush(){if(!sb||!S.logged)return;const P=pieces(),jobs=[];
+ async function flush(){if(!sb||!S.logged)return;
+  const {data:{session:ss}}=await sb.auth.getSession();
+  if(!ss||ss.user.id!==S.cur){switched(ss);return}
+  const P=pieces(),jobs=[];
   for(const [k,p] of Object.entries(P)){const j=JSON.stringify(p.v);if(snap[k]===j)continue;
    if(p.t==='set'&&!isAdmin())continue;
    if(p.t==='acc'&&!isAdmin())continue;
@@ -851,7 +854,7 @@ const DB=(()=>{
  /* Cargar todo lo que esta persona puede ver */
  const isNoReg=e=>/datos de tu registro/i.test(String((e&&e.message)||''));
  async function load(p){
-  const me=fail(await sb.rpc('mj_finish_registration',p?{p}:{}));needReg=false;
+  const me=fail(await sb.rpc('mj_finish_registration',p?{p}:{}));needReg=false;warned=false;
   const [dir,accs,studs,subs,hours,notifs,items,sets]=await Promise.all([
    sb.rpc('mj_directory').then(fail),sb.from('mj_accounts').select('*').then(fail),sb.from('mj_studs').select('id,data').then(fail),
    sb.from('mj_subs').select('id,owner,status,pts,sec,val,data,photo,show_photo,at').order('at',{ascending:true}).limit(5000).then(fail),
@@ -883,7 +886,13 @@ const DB=(()=>{
    cat:Array.isArray(setv.cat)&&setv.cat.length?setv.cat:JSON.parse(JSON.stringify(R))});
   loadedAt=Date.now();return me}
 
- async function reload(quiet){if(!sb)return;try{const {data:{session}}=await sb.auth.getSession();if(!session)return;const keep=S.cur;await load();bind();remember();if(S.role==='alumno'&&!S.visits.includes(dayKey())){S.visits.push(dayKey());save()}if(keep===S.cur&&!document.querySelector('#front.dragging'))renderAll()}catch(e){if(!quiet)toast(msg(e))}}
+ let warned=false;
+ function switched(ss){if(warned)return;warned=true;
+  toast(ss?'Entraste con otra cuenta en otra pestaña. Te mostramos esa cuenta; lo que no se guardó se descartó.':'Se cerró la sesión en otra pestaña.');
+  setTimeout(()=>location.reload(),1800)}
+ if(sb&&sb.auth.onAuthStateChange)sb.auth.onAuthStateChange((ev,ss)=>{if(!S.logged||ev==='TOKEN_REFRESHED'||ev==='INITIAL_SESSION')return;if(!ss||ss.user.id!==S.cur)switched(ss)});
+ addEventListener('storage',e=>{if(!sb||!S.logged||!e.key||!/auth-token/.test(e.key))return;let ss=null;try{ss=e.newValue?JSON.parse(e.newValue):null}catch(x){}const uid=ss&&(ss.user||(ss.currentSession||{}).user||{}).id;if(!uid)switched(null);else if(uid!==S.cur)switched({user:{id:uid}})});
+ async function reload(quiet){if(!sb)return;try{const {data:{session}}=await sb.auth.getSession();if(!session||session.user.id!==S.cur){switched(session);return}const keep=S.cur;await load();bind();remember();if(S.role==='alumno'&&!S.visits.includes(dayKey())){S.visits.push(dayKey());save()}if(keep===S.cur&&!document.querySelector('#front.dragging'))renderAll()}catch(e){if(!quiet)toast(msg(e))}}
 
  return{sb,msg,recovery,
   ready:()=>!!sb,
@@ -897,7 +906,7 @@ const DB=(()=>{
   async completeReg(meta){try{await load(meta)}catch(e){throw new Error(msg(e))}},
   async signUp(email,pass,meta){const r=await sb.auth.signUp({email,password:pass,options:{data:meta,emailRedirectTo:location.origin+location.pathname}});if(r.error)throw new Error(msg(r.error));
    if(!r.data.session)return 'confirm';try{await load();return 'ok'}catch(e){await sb.auth.signOut();throw new Error(msg(e))}},
-  async signOut(){needReg=false;try{await sb.auth.signOut()}catch(e){}},
+  async signOut(){needReg=false;warned=true;try{await sb.auth.signOut()}catch(e){}},
   async resetPassword(email){const r=await sb.auth.resetPasswordForEmail(email,{redirectTo:location.origin+location.pathname});if(r.error)throw new Error(msg(r.error))},
   async newPassword(p){const r=await sb.auth.updateUser({password:p});if(r.error)throw new Error(msg(r.error))},
   async studentExists(mail){try{return fail(await sb.rpc('mj_student_exists',{mail}))}catch(e){return true}},
