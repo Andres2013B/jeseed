@@ -240,7 +240,9 @@ create table if not exists public.mj_items (
 alter table public.mj_items enable row level security;
 drop policy if exists "mj_items: leer" on public.mj_items;
 create policy "mj_items: leer" on public.mj_items for select to authenticated using (
-  kind in ('aviso', 'featured', 'custom')
+  kind in ('aviso', 'featured')
+  or (kind = 'custom' and (data ->> 'kid' is null
+      or exists (select 1 from public.mj_accounts k where k.id::text = data ->> 'kid' and public.mj_can_see(k.id))))
   or public.mj_is_admin()
   or author = auth.uid()
   or (kind = 'proposal' and data ->> 'status' = 'approved'));
@@ -249,6 +251,9 @@ create policy "mj_items: crear" on public.mj_items for insert to authenticated w
   author = auth.uid() and (
     public.mj_is_admin()
     or kind = 'log'
+    -- la familia puede crear retos solo para su propio hijo o hija
+    or (kind = 'custom' and (public.mj_me()).role = 'familia' and (public.mj_me()).child is not null
+        and data ->> 'kid' = (public.mj_me()).child::text)
     or (kind = 'proposal' and (public.mj_me()).role in ('alumno', 'maestro') and coalesce(data ->> 'status', 'pending') = 'pending')
     or (kind in ('aviso', 'remind') and (public.mj_me()).role = 'maestro' and (public.mj_me()).status = 'approved'
         and (kind = 'remind' or (data ->> 'to' = (public.mj_me()).grp and data ->> 'sec' = (public.mj_me()).sec)))
@@ -257,7 +262,8 @@ drop policy if exists "mj_items: coordinación" on public.mj_items;
 create policy "mj_items: coordinación" on public.mj_items for update to authenticated
   using (public.mj_is_admin()) with check (public.mj_is_admin());
 drop policy if exists "mj_items: borrar" on public.mj_items;
-create policy "mj_items: borrar" on public.mj_items for delete to authenticated using (public.mj_is_admin());
+create policy "mj_items: borrar" on public.mj_items for delete to authenticated using (
+  public.mj_is_admin() or (kind = 'custom' and author = auth.uid() and data ->> 'kid' is not null));
 
 -- ---------------------------------------------------------- Claves de maestro
 create table if not exists public.mj_invites (

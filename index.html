@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
 <style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}img{max-width:100%}[hidden]{display:none!important}[data-act="speak"].speaking{animation:vozp 1.2s ease-in-out infinite}@keyframes vozp{50%{opacity:.6;transform:scale(.97)}}@media (prefers-reduced-motion:reduce){[data-act="speak"].speaking{animation:none;outline:3px solid currentColor}}
+#demobar:not([hidden]){display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:2px 12px;padding:6px 16px;background:var(--sun);color:#1b1b1b;font-weight:700;font-size:14px;text-align:center;position:sticky;top:0;z-index:30}#demobar .linkbtn{color:#1b1b1b;text-decoration:underline;font-weight:900}
 </style>
 <title>Maayan Jésed</title>
 <meta name="claude:viewport-fit-sides" content="cover">
@@ -951,7 +952,7 @@ const AGES={Kinder:'3 a 5 años',baja:'6 a 8 años',alta:'9 a 11 años',Secundar
 const AREAS=[['Kinder','Kínder · 3 a 5'],['Primaria-baja','Primaria 1.º a 3.º · 6 a 8'],['Primaria-alta','Primaria 4.º a 6.º · 9 a 11'],['Secundaria','Secundaria · 12 a 15'],['Prepa','Prepa · 15 a 18'],['fiesta','Temporadas']];
 const bandOfGrp=(sec,grp)=>sec==='Primaria'?((parseInt(grp,10)||4)<=3?'baja':'alta'):null;
 const areaOf=r=>r.fest?'fiesta':r.sec==='Primaria'?'Primaria-'+(r.band||'alta'):r.sec;
-const ageOf=r=>r.fest?'todas las edades':AGES[r.band||r.sec]||'';
+const ageOf=r=>r.kid?'reto de tu familia':r.fest?'todas las edades':AGES[r.band||r.sec]||'';
 const DIMS={E:['Educativo','var(--sky)'],S:['Espiritual','var(--lilac)'],M:['Moral','var(--sun)'],P:['Ayuda al prójimo','var(--coral)']};
 const VALS={hakarat:'Hakarat hatov · gratitud',kibud:'Kibud av va’em · honrar a la familia',derej:'Derej eretz · respeto',ahava:'Veahavtá lereajá kamoja · ama a tu prójimo',shmira:'Shmirat halashón · cuidar lo que decimos',teshuva:'Teshuvá · reconocer el error y reparar',shalom:'Shalom · construir la paz',jesed:'Guemilut jasadim · actos de bondad',tzedaka:'Tzedaká · compartir con quien lo necesita',hajnasat:'Hajnasat orjim · recibir al otro',hidur:'Hidur pnei zakén · honrar a los mayores',tzaar:'Tzaar baalei jaim · cuidar a los animales',tikun:'Tikún olam · mejorar el mundo',limud:'Limud · aprender y enseñar'};
 const OBJ={
@@ -1007,6 +1008,7 @@ const PKEYS=['v','cur','cat','invites','accounts','studs','custom','avisos','log
    Las reglas de seguridad viven en la base de datos (maayan-jesed.sql). */
 const MJ_URL='https://tcnewagyrlyllxkaazgu.supabase.co';
 const MJ_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRjbmV3YWd5cmx5bGx4a2Fhemd1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMyNzI2NDYsImV4cCI6MjEwODg0ODY0Nn0.dPdx-HeE1JQdaXwyOaL1yWSVbE0pOG-DuY18X4WRiYA';
+let DEMO=false;
 const DB=(()=>{
  const recovery=/type=recovery/.test(location.hash);
  const sb=window.supabase&&window.supabase.createClient?window.supabase.createClient(MJ_URL,MJ_KEY):null;
@@ -1065,7 +1067,7 @@ const DB=(()=>{
   if(t==='item')return fail(await sb.from('mj_items').delete().eq('kind',a).eq('id',k.slice(t.length+a.length+2)));
   if(t==='inv')return fail(await sb.from('mj_invites').delete().eq('code',a))}
 
- async function flush(){if(!sb||!S.logged)return;
+ async function flush(){if(!sb||!S.logged||DEMO)return;
   const {data:{session:ss}}=await sb.auth.getSession();
   if(!ss||ss.user.id!==S.cur){switched(ss);return}
   const P=pieces(),jobs=[];
@@ -1080,7 +1082,7 @@ const DB=(()=>{
   for(const k of gone){try{await remove(k);delete snap[k]}catch(e){err=e;console.error(k,e)}}
   if(jobs.some(j=>j[1].t==='newnotif'))await reload(true);
   if(err){toast(msg(err));await reload(true)}}
- function schedule(){clearTimeout(timer);timer=setTimeout(()=>{busy=busy.then(flush).catch(e=>console.error(e))},250)}
+ function schedule(){if(DEMO){demoSave();return}clearTimeout(timer);timer=setTimeout(()=>{busy=busy.then(flush).catch(e=>console.error(e))},250)}
 
  /* Cargar todo lo que esta persona puede ver */
  const isNoReg=e=>/datos de tu registro/i.test(String((e&&e.message)||''));
@@ -1121,9 +1123,9 @@ const DB=(()=>{
  function switched(ss){if(warned)return;warned=true;
   toast(ss?'Entraste con otra cuenta en otra pestaña. Te mostramos esa cuenta; lo que no se guardó se descartó.':'Se cerró la sesión en otra pestaña.');
   setTimeout(()=>location.reload(),1800)}
- if(sb&&sb.auth.onAuthStateChange)sb.auth.onAuthStateChange((ev,ss)=>{if(!S.logged||ev==='TOKEN_REFRESHED'||ev==='INITIAL_SESSION')return;if(!ss||ss.user.id!==S.cur)switched(ss)});
- addEventListener('storage',e=>{if(!sb||!S.logged||!e.key||!/auth-token/.test(e.key))return;let ss=null;try{ss=e.newValue?JSON.parse(e.newValue):null}catch(x){}const uid=ss&&(ss.user||(ss.currentSession||{}).user||{}).id;if(!uid)switched(null);else if(uid!==S.cur)switched({user:{id:uid}})});
- async function reload(quiet){if(!sb)return;try{const {data:{session}}=await sb.auth.getSession();if(!session||session.user.id!==S.cur){switched(session);return}const keep=S.cur;await load();bind();remember();if(S.role==='alumno'&&!S.visits.includes(dayKey())){S.visits.push(dayKey());save()}if(keep===S.cur&&!document.querySelector('#front.dragging'))renderAll()}catch(e){if(!quiet)toast(msg(e))}}
+ if(sb&&sb.auth.onAuthStateChange)sb.auth.onAuthStateChange((ev,ss)=>{if(DEMO||!S.logged||ev==='TOKEN_REFRESHED'||ev==='INITIAL_SESSION')return;if(!ss||ss.user.id!==S.cur)switched(ss)});
+ addEventListener('storage',e=>{if(e.key==='mj-demo'&&DEMO){demoSync();return}if(DEMO||!sb||!S.logged||!e.key||!/auth-token/.test(e.key))return;let ss=null;try{ss=e.newValue?JSON.parse(e.newValue):null}catch(x){}const uid=ss&&(ss.user||(ss.currentSession||{}).user||{}).id;if(!uid)switched(null);else if(uid!==S.cur)switched({user:{id:uid}})});
+ async function reload(quiet){if(!sb||DEMO)return;try{const {data:{session}}=await sb.auth.getSession();if(!session||session.user.id!==S.cur){switched(session);return}const keep=S.cur;await load();bind();remember();if(S.role==='alumno'&&!S.visits.includes(dayKey())){S.visits.push(dayKey());save()}if(keep===S.cur&&!document.querySelector('#front.dragging'))renderAll()}catch(e){if(!quiet)toast(msg(e))}}
 
  return{sb,msg,recovery,
   ready:()=>!!sb,
@@ -1131,7 +1133,7 @@ const DB=(()=>{
    try{pub=fail(await sb.rpc('mj_public_stats'))}catch(e){pub=null}
    const {data:{session}}=await sb.auth.getSession();if(!session)return false;
    for(let i=0;i<3;i++){try{await load();return true}catch(e){if(isNoReg(e)){needReg=true;return false}console.error('No se pudieron cargar los datos',e);if(i===2){toast('No pudimos cargar tus datos ('+msg(e)+'). Tu sesión sigue abierta: recarga la página.');return false}await new Promise(r=>setTimeout(r,1200*(i+1)))}}},
-  publicStats:()=>pub,likes:()=>likes,
+  publicStats:()=>pub,likes:()=>DEMO?demoLikes():likes,
   async signIn(email,pass){const r=await sb.auth.signInWithPassword({email,password:pass});if(r.error)throw new Error(msg(r.error));try{await load()}catch(e){if(isNoReg(e)){needReg=true;throw new Error('NEEDREG')}throw e}return true},
   needReg:()=>needReg,
   async completeReg(meta){try{await load(meta)}catch(e){throw new Error(msg(e))}},
@@ -1148,6 +1150,24 @@ const DB=(()=>{
 
 let S=fresh();S.cur=null;S.logged=false;let catSec='Primaria-alta';
 function fresh(){const o=JSON.parse(JSON.stringify(DEF));o.cat=JSON.parse(JSON.stringify(R));try{o.simDate=localStorage.getItem('mj-simdate')||''}catch(e){}return o}
+/* ---------- Cuentas de prueba: viven solo en este navegador y no tocan los datos reales ---------- */
+const DEMO_ACCS=[
+ {id:'d-a1',role:'alumno',name:'Ana',email:'ana@prueba.mx',sec:'Primaria',grp:'4.º B'},
+ {id:'d-a2',role:'alumno',name:'Leo',email:'leo@prueba.mx',sec:'Prepa',grp:'5.º A'},
+ {id:'d-f1',role:'familia',name:'Mamá de Ana',email:'familia.ana@prueba.mx',child:'d-a1'},
+ {id:'d-m1',role:'maestro',name:'Maestra Laura',email:'laura@prueba.mx',sec:'Primaria',grp:'4.º B',status:'approved'},
+ {id:'d-m2',role:'maestro',name:'Maestro David',email:'david@prueba.mx',sec:'Prepa',grp:'5.º A',status:'approved'},
+ {id:'d-c1',role:'admin',name:'Coordinación',email:'coordinacion@prueba.mx',status:'approved'}];
+const demoDetail=a=>a.role==='familia'?'Familia de '+(DEMO_ACCS.find(x=>x.id===a.child)||{}).name:a.role==='admin'?'Todo el colegio':`${SEC[a.sec]} · ${a.grp}`;
+function demoFresh(){const o=fresh();o.accounts=JSON.parse(JSON.stringify(DEMO_ACCS));o.studs={};DEMO_ACCS.filter(a=>a.role==='alumno').forEach(a=>o.studs[a.id]=NEWSTUD());o.invites=[{code:'MJ-PRUEBA1',sec:'Secundaria',grp:'2.º C',used:null,at:Date.now()}];o.demo=true;return o}
+function demoLoad(){try{const d=JSON.parse(localStorage.getItem('mj-demo')||'null');if(d&&Array.isArray(d.accounts)&&d.studs){const o=Object.assign(fresh(),d);o.cat=mergeCat(d.cat,(d.settings||{}).delCat);o.settings=Object.assign(JSON.parse(JSON.stringify(DEF.settings)),d.settings||{});return o}}catch(e){}return demoFresh()}
+function demoSave(){if(!DEMO)return;const o={};PKEYS.forEach(k=>o[k]=S[k]);try{localStorage.setItem('mj-demo',JSON.stringify(o))}catch(e){toast('El modo de prueba se llenó. Reinícialo desde «Cambiar de cuenta».')}}
+function demoSync(){const cur=S.cur;S=demoLoad();S.cur=cur;bind();if(!document.querySelector('.sheet'))renderAll()}
+function demoLikes(){const c={};Object.values(S.studs||{}).forEach(st=>(st.likes||[]).forEach(id=>c[id]=(c[id]||0)+1));return c}
+function enterDemo(id,quiet){if(!DEMO_ACCS.some(a=>a.id===id))return;DEMO=true;S=demoLoad();try{sessionStorage.setItem('mj-demo-cur',id)}catch(e){}setAccount(id);if(!quiet)toast(`Entraste como ${curAcc().name} (prueba). Nada de esto cuenta para el colegio.`)}
+function exitDemo(){DEMO=false;try{sessionStorage.removeItem('mj-demo-cur');sessionStorage.removeItem('mj-sesion')}catch(e){}S=fresh();S.cur=null;S.logged=false;ptab=null;closeSheet();renderAll(true);scrollTo(0,0);toast('Saliste del modo de prueba.')}
+function demoPicker(){return `<div class="stack" style="gap:8px;margin-top:6px"><b>Cuentas de prueba</b><p class="hint">Para conocer la app sin registrarte. Lo que hagas aquí se guarda solo en este navegador y no cuenta para el colegio.</p><div class="roles">${DEMO_ACCS.map(a=>`<button class="rolecard${DEMO&&S.cur===a.id?' on':''}" data-act="demo" data-id="${a.id}">${ic(ROLE_I[a.role],22)}<b>${esc(a.name)}</b><span>${ROLE_N[a.role]} · ${esc(demoDetail(a))}</span></button>`).join('')}</div></div>`}
+function demoBar(){let b=document.getElementById('demobar');if(!b){b=document.createElement('div');b.id='demobar';const h=document.querySelector('header.brandbar');if(!h)return;h.after(b)}b.hidden=!(DEMO&&S.logged);if(DEMO&&S.logged)b.innerHTML=`<span><b>Modo de prueba</b> · ${esc((curAcc()||{}).name||'')}</span><button class="linkbtn" data-act="roles">Cambiar de cuenta</button>`}
 function save(){const sid=curSid();if(S.role==='alumno'&&sid&&S.studs[sid]&&S.subs){Object.assign(S.studs[sid],{accepted:S.accepted,subs:S.subs,likes:S.likes,visits:S.visits,goal:S.goal,kinder:S.kinder,consent:S.consent,notifs:S.notifs,notifSet:S.notifSet,hours:S.hours})}
  else if(S.role==='familia'&&sid&&S.studs[sid]){Object.assign(S.studs[sid],{consent:S.consent,notifSet:S.notifSet})}
  try{S.simDate?localStorage.setItem('mj-simdate',S.simDate):localStorage.removeItem('mj-simdate')}catch(e){}DB.schedule()}
@@ -1171,10 +1191,15 @@ const reto=id=>allR().find(r=>r.id===id);
 const approved=()=>S.subs.filter(s=>s.status==='approved');
 const myPts=()=>approved().reduce((a,s)=>a+s.pts,0);
 const isAdmin=()=>S.role==='admin';
-function lvlDone(t,L){return approved().filter(s=>{const r=s.rid&&reto(s.rid);return r&&r.trk===t&&r.lvl===L}).length}
-function nextLvlCard(t){const L=lvlOf(t),ok=Math.min(2,lvlDone(t,L)),rev=S.subs.filter(s=>s.status==='pending'&&(()=>{const x=s.rid&&reto(s.rid);return x&&x.trk===t&&x.lvl===L})()).length,who=t==='colegio'?'tu maestro':t==='casa'?'tu familia':'tu familia o maestro';
- return `<h2 style="font-size:22px">${ic('lock',20)} Nivel ${L+1} · ${LV[L+1]}</h2><p style="margin:0">Retos más retadores que valen <b>+${LVP[L+1]} ${(LVP[L+1])===1?'gota':'gotas'}</b>.</p><div class="nl-bar"><span style="width:${ok/2*100}%"></span></div><p style="margin:0;font-weight:900">${ok} de 2 retos aprobados${rev?` · ${rev} en revisión`:''}</p><ol class="nl-steps"><li>Haz un reto de este nivel.</li><li>Toca «¡Lo hago!» y cuéntalo.</li><li>Lo confirma ${who} y coordinación lo autoriza.</li></ol><button class="btn small" data-act="bag">${ic('bag',18)} Ver mi bolsa</button>`}
-function lvlOf(t){let L=1;while(L<3&&lvlDone(t,L)>=2)L++;return L}
+/* Para subir de nivel hay que tener aprobados TODOS los retos de ese nivel (los del catálogo para su edad) */
+const meCtx=()=>({sec:S.mySec,band:myBand(),subs:S.subs||[]});
+const kidCtx=id=>{const a=stuAcc(id)||{};return{sec:a.sec,band:bandOfGrp(a.sec,a.grp),subs:(S.studs[id]||{subs:[]}).subs}};
+function lvlList(t,L,c){c=c||meCtx();return S.cat.filter(r=>!r.fest&&r.trk===t&&r.lvl===L&&r.sec===c.sec&&(!r.band||r.band===c.band))}
+function lvlNeed(t,L,c){return lvlList(t,L,c).length}
+function lvlDone(t,L,c){c=c||meCtx();const ok=new Set(c.subs.filter(s=>s.status==='approved').map(s=>s.rid));return lvlList(t,L,c).filter(r=>ok.has(r.id)).length}
+function nextLvlCard(t){const L=lvlOf(t),need=Math.max(1,lvlNeed(t,L)),ok=Math.min(need,lvlDone(t,L)),rev=S.subs.filter(s=>s.status==='pending'&&(()=>{const x=s.rid&&reto(s.rid);return x&&x.trk===t&&x.lvl===L})()).length,who=t==='colegio'?'tu maestro':t==='casa'?'tu familia':'tu familia o maestro';
+ return `<h2 style="font-size:22px">${ic('lock',20)} Nivel ${L+1} · ${LV[L+1]}</h2><p style="margin:0">Retos más retadores que valen <b>+${LVP[L+1]} ${(LVP[L+1])===1?'gota':'gotas'}</b>.</p><div class="nl-bar"><span style="width:${ok/need*100}%"></span></div><p style="margin:0;font-weight:900">${ok} de ${need} retos aprobados${rev?` · ${rev} en revisión`:''}</p><ol class="nl-steps"><li>Haz todos los retos de este nivel (te faltan ${need-ok}).</li><li>Toca «¡Lo hago!» y cuéntalo.</li><li>Lo confirma ${who} y coordinación lo autoriza.</li></ol><button class="btn small" data-act="bag">${ic('bag',18)} Ver mi bolsa</button>`}
+function lvlOf(t,c){let L=1;while(L<3&&lvlDone(t,L,c)>=lvlNeed(t,L,c))L++;return L}
 function subOf(rid){const l=S.subs.filter(s=>s.rid===rid);return l[l.length-1]}
 function stOf(rid){const s=subOf(rid);if(s&&s.status==='approved')return 'done';if(s&&s.status==='pending')return 'review';if(s&&s.status==='rejected')return 'fix';return 'none'}
 function streak(){const v=new Set(S.visits);let n=0,d=new Date();for(let i=0;i<400;i++){if(!v.has(dayKey(d)))break;n++;d.setDate(d.getDate()-1)}return n}
@@ -1204,7 +1229,7 @@ const catChip=c=>`<span class="cat" style="--c:${CAT[c]}"><i></i>${CATN[c]}</spa
 const statusPill=s=>({pending:'<span class="status pending">Esperando revisión</span>',approved:'<span class="status approved">Aprobada</span>',rejected:'<span class="status rejected">Para ajustar</span>'}[s]);
 
 /* ---------- Baraja ---------- */
-function pool(){const fe=nextFest();let L=allR().filter(r=>stOf(r.id)==='none'&&(r.fest?r.fest===fkey(fe):(fitsMe(r)&&r.lvl<=lvlOf(r.trk))));
+function pool(){const fe=nextFest();let L=allR().filter(r=>stOf(r.id)==='none'&&(r.fest?r.fest===fkey(fe):(fitsMe(r)&&(r.kid||r.lvl<=lvlOf(r.trk)))));
  const cur=r=>r.lvl===lvlOf(r.trk)?0:1;
  if(TRK[filter])L=L.filter(r=>r.trk===filter).sort((a,b)=>cur(a)-cur(b));
  if(filter==='fiesta')L=L.filter(r=>r.fest===fkey(fe));
@@ -1278,7 +1303,7 @@ function renderTop(){const fe=nextFest(),d=daysTo(fe.from),pend=S.subs.filter(s=
  document.getElementById('filters').innerHTML=isAdmin()?'':FILTERS.map(f=>`<button class="chip ${f[0]==='fiesta'?'festchip':''} ${filter===f[0]?'on':''}" ${f[0]==='fiesta'?`style="--fc:${fe.c}"`:''} data-act="filter" data-id="${f[0]}" aria-pressed="${filter===f[0]}">${f[0]==='fiesta'?ic('spark',14,'#FFFFFF')+' '+fe.n:f[1]}</button>`).join('');
  document.getElementById('filters').hidden=isAdmin();document.getElementById('lvl').innerHTML=isAdmin()?'':lvlHTML()}
 const dots=(L,cls='')=>`<span class="lvdots ${cls}" aria-hidden="true">${[1,2,3].map(n=>`<i class="${n<L?'full':n===L?'cur':''}"></i>`).join('')}</span>`;
-function lvlBox(t){const L=lvlOf(t),d=lvlDone(t,L);return `<div class="lv"><div class="row" style="justify-content:space-between"><b>${TRK[t]}</b><span class="lvn">Nivel ${L} · ${LV[L]}</span></div>${dots(L)}<p class="hint">${L<3?`${d} de 2 retos aprobados para subir a ${LV[L+1]}, donde cada reto vale +${LVP[L+1]} ${(LVP[L+1])===1?'gota':'gotas'}.`:d>=2?'¡Nivel máximo completado! Eres un río de jésed.':`Nivel máximo: cada reto vale +${LVP[3]} ${(LVP[3])===1?'gota':'gotas'}.`}</p></div>`}
+function lvlBox(t){const L=lvlOf(t),d=lvlDone(t,L),need=lvlNeed(t,L);return `<div class="lv"><div class="row" style="justify-content:space-between"><b>${TRK[t]}</b><span class="lvn">Nivel ${L} · ${LV[L]}</span></div>${dots(L)}<p class="hint">${L<3?`${d} de ${need} retos aprobados: completa todos los de este nivel para subir a ${LV[L+1]}, donde cada reto vale +${LVP[L+1]} ${(LVP[L+1])===1?'gota':'gotas'}.`:d>=need?'¡Nivel máximo completado! Eres un río de jésed.':`Nivel máximo: cada reto vale +${LVP[3]} ${(LVP[3])===1?'gota':'gotas'}.`}</p></div>`}
 function lvlHTML(){return `<p class="hint" style="margin-bottom:8px">${ic('user',14)} Retos pensados para tu edad: <b>${myAge()}</b> · ${SEC[S.mySec]} ${esc(myGroup())}</p>`+lvlHTML0()}
 function lvlHTML0(){if(TRK[filter])return lvlBox(filter);if(filter==='parati')return `<div class="lvwrap">${['rapido','casa','colegio'].map(t=>{const L=lvlOf(t);return `<button class="lvmini" data-act="filter" data-id="${t}" aria-label="${TRK[t]}: nivel ${L}, ${LV[L]}"><b>${TRKS[t]}</b><span>Nivel ${L} · ${LV[L]}</span>${dots(L,'sm')}</button>`}).join('')}</div>`;return ''}
 function renderSpring(){const f=fount(),g=nextGoal(),pct=f.total/g;
@@ -1295,7 +1320,7 @@ function springMode(){const sp=document.getElementById('spring');if(!sp)return;s
 addEventListener('scroll',springMode,{passive:true});addEventListener('resize',springMode);
 function feed(){const LK=DB.likes();const mine=allApproved().sort((a,b)=>a.at-b.at).map(s=>{const o=S.role==='alumno'&&s.owner===curSid(),a=stuAcc(s.owner),on=S.likes.includes(s.id);return {id:s.id,sec:s.sec,grp:s.anon?'Anónimo':o?'Tú':(a?a.name.split(' ')[0]+' · '+a.grp:'Alumno'),cat:s.cat,pts:s.pts,text:s.text,likes:Math.max(0,(LK[s.id]||0)-(on?1:0)),mine:o,real:true,photo:s.show?s.photo:null}});return mine.reverse()}
 function showStory(){const L=feed(),el=document.getElementById('story');if(!el)return;if(!L.length){el.textContent='Aquí aparecerán las buenas acciones aprobadas.';return}const p=L[storyIdx%L.length];el.textContent=SEC[p.sec]+': «'+p.text+'»'}
-function renderAll(first){if(!S.logged){renderLogin();return}const st=S.role==='alumno';renderChrome();document.getElementById('student').hidden=!st;document.getElementById('spring').hidden=!st;document.body.classList.toggle('staff',!st);document.body.classList.toggle('kinder',isK());
+function renderAll(first){demoBar();if(!S.logged){renderLogin();return}const st=S.role==='alumno';renderChrome();document.getElementById('student').hidden=!st;document.getElementById('spring').hidden=!st;document.body.classList.toggle('staff',!st);document.body.classList.toggle('kinder',isK());
  if(st){document.getElementById('panel').hidden=true;document.getElementById('panel').innerHTML='';document.getElementById('deckwrap').hidden=false;renderTop();renderDeck(first);renderSpring()}
  else{renderPanel();const dw=(S.role==='maestro'&&ptab==='validar')||(isAdmin()&&ptab==='revisar');document.getElementById('deckwrap').hidden=!dw;if(dw)renderDeck(first)}
  renderLogin()}
@@ -1391,7 +1416,7 @@ function rachaSheet(){const v=new Set(S.visits),k=streak(),days=[...Array(14)].m
  <section class="card"><b>Reconocimientos por constancia</b>${[[3,'Chispa'],[7,'Llama'],[14,'Fogata'],[30,'Antorcha de jésed']].map(([n,l])=>`<div class="hist"><p style="font-weight:700">${l}<br><span class="hint">${n} días seguidos</span></p>${k>=n?'<span class="status approved">Lograda</span>':`<span class="hint">Faltan ${n-k}</span>`}</div>`).join('')}<p class="hint" style="margin-top:6px">La racha no da gotas: reconoce la constancia.</p></section>`)}
 const uniqFest=()=>FEST.filter((f,i,a)=>a.findIndex(x=>fkey(x)===fkey(f))===i);
 function catalogHTML(){const L=catSec==='fiesta'?allR().filter(r=>r.fest):allR().filter(r=>!r.fest&&areaOf(r)===catSec);
- const row=r=>`<div class="hist"><p style="min-width:0"><b>${esc(r.t)}</b>${r.salon?` <span class="hint">· solo ${esc(r.salon)}</span>`:''}<br><span class="hint">${esc(r.d)} · ${r.min} min · +${r.pts}</span><br><span class="hint">${ic('target',12)} ${esc(objOf(r).obj)} · ${VALS[objOf(r).val]}</span></p><div class="row" style="gap:6px;flex:none"><button class="btn ghost small" data-act="redit" data-id="${r.id}" aria-label="Editar ${esc(r.t)}">${ic('edit',16)}</button><button class="btn ghost small" data-act="rdel" data-id="${r.id}" aria-label="Borrar ${esc(r.t)}">${ic('trash',16,'var(--bad)')}</button></div></div>`;
+ const row=r=>`<div class="hist"><p style="min-width:0"><b>${esc(r.t)}</b>${r.salon?` <span class="hint">· solo ${esc(r.salon)}</span>`:''}${r.kid?` <span class="hint">· de una familia para ${esc((stuAcc(r.kid)||{}).name||'su hijo')}</span>`:''}<br><span class="hint">${esc(r.d)} · ${r.min} min · +${r.pts}</span><br><span class="hint">${ic('target',12)} ${esc(objOf(r).obj)} · ${VALS[objOf(r).val]}</span></p><div class="row" style="gap:6px;flex:none"><button class="btn ghost small" data-act="redit" data-id="${r.id}" aria-label="Editar ${esc(r.t)}">${ic('edit',16)}</button><button class="btn ghost small" data-act="rdel" data-id="${r.id}" aria-label="Borrar ${esc(r.t)}">${ic('trash',16,'var(--bad)')}</button></div></div>`;
  const body=catSec==='fiesta'?uniqFest().map(f=>{const X=L.filter(r=>r.fest===fkey(f));return `<section class="card"><b style="font-size:17px">${f.n}</b>${X.map(row).join('')||'<p class="hint">Sin retos.</p>'}</section>`}).join('')
   :Object.keys(TRK).map(t=>`<section class="card"><b style="font-size:17px">${TRK[t]}</b>${[1,2,3].map(l=>{const X=L.filter(r=>r.trk===t&&r.lvl===l);return `<div class="eyebrow" style="margin-top:12px">Nivel ${l} · ${LV[l]} · +${LVP[l]} ${(LVP[l])===1?'gota':'gotas'} · ${X.length} ${X.length===1?'reto':'retos'}</div>${X.map(row).join('')||'<p class="hint">Sin retos en este nivel.</p>'}`}).join('')}</section>`).join('');
  return `<div class="row" style="justify-content:space-between;flex-wrap:wrap;margin-top:6px"><b style="font-size:18px">Catálogo de retos · ${L.length}</b><button class="btn small" data-act="redit" data-id="new">${ic('plus',16,'var(--on-primary)')} Agregar reto</button></div><div class="chips" role="group" aria-label="Área">${AREAS.map(([x,l])=>`<button class="chip ${catSec===x?'on':''}" data-act="rsec" data-id="${x}" aria-pressed="${catSec===x}">${l}</button>`).join('')}</div>${body}`}
@@ -1445,9 +1470,9 @@ function adjustSheet(id){const s=S.subs.find(x=>x.id===id);
  sheet(`<div class="eyebrow">Revisión con detalle</div><h2 style="font-size:24px">${esc(s.title)}</h2><p class="preview">${esc(s.text)}</p>${photoBlock(s)}${needVal(s)?`<p class="hint">${valLabel(s)}</p>`:''}${aiBox(s)}<label class="f" for="r-pts">Gotas a otorgar<input class="in" id="r-pts" type="number" min="0" max="5" value="${s.pts}"></label><label class="f" for="r-com">Mensaje para el alumno (opcional)<textarea class="in" id="r-com" maxlength="300" placeholder="Ej.: ¡Qué gran gesto!"></textarea></label><button class="btn full" data-act="approve" data-id="${s.id}">${ic('check',20)} Aprobar</button><p class="hint">El asistente solo da pistas; siempre decide una persona.</p>`)}
 function decide(id,ok){const s=S.subs.find(x=>x.id===id),c=document.getElementById('r-com'),com=c?c.value.trim():'';
  if(!ok&&!com){toast('Escribe qué debe corregir el alumno.');c&&c.focus();return}
- const before=badgeCount(),rr=s.rid&&reto(s.rid),lb=rr&&rr.trk?lvlOf(rr.trk):0;s.status=ok?'approved':'rejected';s.comment=com;if(!(ok&&s.show))s.photo=null;const p=document.getElementById('r-pts');if(ok&&p)s.pts=Math.max(0,parseInt(p.value,10)||0);notify(ok?`¡Aprobaron «${s.title}»! +${s.pts} ${(s.pts)===1?'gota':'gotas'}.`:`Te pidieron corregir «${s.title}»: ${com}`,s.owner);
+ const before=badgeCount(),rr=s.rid&&reto(s.rid),lb=rr&&rr.trk?lvlOf(rr.trk,kidCtx(s.owner)):0;s.status=ok?'approved':'rejected';s.comment=com;if(!(ok&&s.show))s.photo=null;const p=document.getElementById('r-pts');if(ok&&p)s.pts=Math.max(0,parseInt(p.value,10)||0);notify(ok?`¡Aprobaron «${s.title}»! +${s.pts} ${(s.pts)===1?'gota':'gotas'}.`:`Te pidieron corregir «${s.title}»: ${com}`,s.owner);
  S.log.push({title:s.title,status:s.status,comment:com,by:'Coordinación',at:Date.now()});save();closeSheet();renderAll(true);
- if(ok){dropFx(s.pts);const la=rr&&rr.trk?lvlOf(rr.trk):0;if(la>lb)setTimeout(()=>{confetti();toast(`¡Subió al nivel ${LV[la]} en «${TRK[rr.trk]}»! Ahora esos retos valen +${LVP[la]} ${(LVP[la])===1?'gota':'gotas'}.`)},900);else if(badgeCount()>before)setTimeout(()=>{confetti();toast('¡El alumno desbloqueó una insignia!')},900);else toast('Aprobada: la gota cayó al manantial.')}else toast('Regresó al alumno con tu comentario.')}
+ if(ok){dropFx(s.pts);const la=rr&&rr.trk?lvlOf(rr.trk,kidCtx(s.owner)):0;if(la>lb)setTimeout(()=>{confetti();toast(`¡Subió al nivel ${LV[la]} en «${TRK[rr.trk]}»! Ahora esos retos valen +${LVP[la]} ${(LVP[la])===1?'gota':'gotas'}.`)},900);else if(badgeCount()>before)setTimeout(()=>{confetti();toast('¡El alumno desbloqueó una insignia!')},900);else toast('Aprobada: la gota cayó al manantial.')}else toast('Regresó al alumno con tu comentario.')}
 
 /* ---------- Modo TV ---------- */
 function renderTV(){const f=fount(),fe=nextFest(),L=tvFeed(),p=L.length?L[storyIdx%L.length]:{sec:'Primaria',text:'Aquí aparecerán las buenas acciones aprobadas del colegio.'};
@@ -1470,7 +1495,7 @@ const isStaff=()=>S.role==='maestro'||S.role==='admin';
 const isK=()=>S.role==='alumno'&&(S.kinder||(S.mySec==='Kinder'&&S.settings.kinderAuto));
 const myBand=()=>bandOfGrp(S.mySec,myGroup());
 const myAge=()=>AGES[myBand()||S.mySec];
-const fitsMe=r=>r.sec===S.mySec&&(!r.band||r.band===myBand())&&(!r.salon||r.salon===myGroup());
+const fitsMe=r=>r.kid?r.kid===curSid():r.sec===S.mySec&&(!r.band||r.band===myBand())&&(!r.salon||r.salon===myGroup());
 const myGroup=()=>{const g=GRPS[S.mySec];return g.includes(S.grp)?S.grp:g[Math.min(3,g.length-1)]};
 function needVal(s){const r=s.rid&&reto(s.rid);return r&&r.trk==='colegio'?'maestro':r&&(r.trk==='casa'||r.fest)?'familia':null}
 function valLabel(s){const n=needVal(s);if(!n)return '';const who=n==='maestro'?'su maestro':'su familia';if(!s.val)return `Falta que lo confirme ${who}`;return s.val.ok?`Confirmado por ${who}`:`${n==='maestro'?'Su maestro':'Su familia'}: no le consta`}
@@ -1553,7 +1578,7 @@ function stepArt(k){if(k==='swipe')return `<span class="m-card back"></span><spa
 function accDetail(a){return a.role==='alumno'?`${SEC[a.sec]} · ${a.grp}`:a.role==='familia'?`Familia de ${esc((stuAcc(a.child)||{}).name||'')}`:a.role==='maestro'?`${SEC[a.sec]} · ${a.grp}`:'Todo el colegio'}
 function haveSheet(){sheet(`<div class="eyebrow">Entrar</div><h2 style="font-size:26px">Ya tengo cuenta</h2><form class="stack" id="flogin"><label class="f" for="lg-mail">Correo<input class="in" id="lg-mail" type="email" required autocomplete="email" placeholder="nombre@olamiort.edu.mx"></label><label class="f" for="lg-pass">Contraseña<input class="in" id="lg-pass" type="password" required autocomplete="current-password" minlength="6"></label><p class="hint" id="lg-err" role="alert" style="color:var(--bad)"></p><button class="btn full">Entrar</button></form>
  <button class="linkbtn" data-act="forgot">¿Olvidaste tu contraseña?</button>
- <p class="hint">Cada cuenta tiene un solo rol (alumno, familia, maestro o coordinación) y no se puede cambiar.</p>`)}
+ <p class="hint">Cada cuenta tiene un solo rol (alumno, familia, maestro o coordinación) y no se puede cambiar.</p>${demoPicker()}`)}
 function askReg(){renderLogin();const r=document.getElementById('registro');if(r)r.scrollIntoView({block:'start'});toast('Ya entraste. Completa tus datos para terminar tu registro.')}
 function forgotSheet(){const m=((document.getElementById('lg-mail')||{}).value||'').trim();sheet(`<div class="eyebrow">Recuperar acceso</div><h2 style="font-size:26px">¿Olvidaste tu contraseña?</h2><p class="muted" style="font-weight:700">Escribe tu correo y te mandamos un link para crear una nueva.</p><form class="stack" id="fforgot"><label class="f" for="fg-mail">Correo<input class="in" id="fg-mail" type="email" required autocomplete="email" value="${esc(m)}"></label><p class="hint" id="fg-err" role="alert" style="color:var(--bad)"></p><button class="btn full">Mandar link</button></form><button class="linkbtn" data-act="haveacc">Volver a entrar</button>`)}
 function newPassSheet(){sheet(`<div class="eyebrow">Nueva contraseña</div><h2 style="font-size:26px">Crea tu nueva contraseña</h2><form class="stack" id="fnewpass"><label class="f" for="np-1">Nueva contraseña<input class="in" id="np-1" type="password" required minlength="6" autocomplete="new-password"></label><label class="f" for="np-2">Repítela<input class="in" id="np-2" type="password" required minlength="6" autocomplete="new-password"></label><p class="hint" id="np-err" role="alert" style="color:var(--bad)"></p><button class="btn full">Guardar contraseña</button></form>`)}
@@ -1580,7 +1605,7 @@ function personasBody(){const free=[];SECS.forEach(sc=>GRPS[sc].forEach(g=>{if(!
  <section class="card"><b>Claves</b>${S.invites.length?S.invites.slice().reverse().map(i=>{const u=i.used&&stuAcc(i.used);return `<div class="hist"><p style="min-width:0"><b style="font-family:ui-monospace,monospace;letter-spacing:1px">${i.code}</b><br><span class="hint">${SEC[i.sec]} · ${i.grp} · ${u?'Usada por '+esc(u.name):'Disponible'}</span></p>${u?'<span class="status approved">Usada</span>':`<div class="row" style="gap:6px;flex:none"><button class="btn ghost small" data-act="copycode" data-id="${i.code}">Copiar</button><button class="btn ghost small" data-act="delcode" data-id="${i.code}" aria-label="Anular clave">${ic('trash',16,'var(--bad)')}</button></div>`}</div>`}).join(''):'<p class="hint">Todavía no hay claves.</p>'}</section>
  <section class="card"><b>Salones con cuentas</b>${(()=>{const G=[];SECS.forEach(sc=>GRPS[sc].forEach(g=>{const t=teacherOf(sc,g),st=studsAll().filter(a=>a.sec===sc&&a.grp===g);if(t||st.length)G.push(`<div class="hist"><p><b>${SEC[sc]} · ${g}</b><br><span class="hint">${t?esc(t.name):'Sin maestro'} · ${st.length} ${st.length===1?'alumno':'alumnos'}: ${st.map(a=>esc(a.name)).join(', ')||'—'} · ${S.accounts.filter(f=>f.role==='familia'&&st.some(a=>a.id===f.child)).length} familias</span></p></div>`)}));return G.join('')||'<p class="hint">Todavía no hay cuentas.</p>'})()}</section>`}
 
-function rolesSheet(){const a=curAcc();sheet(`<div class="eyebrow">Mi cuenta</div><h2 style="font-size:26px">${esc(a.name)}</h2><p class="muted" style="font-weight:700">${ROLE_N[a.role]} · ${accDetail(a)}<br>${esc(a.email)}</p>${a.role==='alumno'?`<p class="hint">${(t=>t?'Tu maestro: '+esc(t.name):'Tu salón todavía no tiene maestro registrado')(teacherOf(a.sec,a.grp))}</p>`:''}${a.role==='familia'?'<p class="hint">Tu cuenta está ligada a tu hijo o hija y solo ves su información.</p>':''}<p class="hint">El rol de cada cuenta lo define el registro y no se puede cambiar. Para ver la app como otra persona, cierra sesión y entra con otra cuenta.</p><button class="btn ghost full" data-act="logout">${ic('logout',18)} Cerrar sesión</button>`)}
+function rolesSheet(){const a=curAcc();if(DEMO){sheet(`<div class="eyebrow">Modo de prueba</div><h2 style="font-size:26px">${esc(a.name)}</h2><p class="muted" style="font-weight:700">${ROLE_N[a.role]} · ${esc(demoDetail(a))}</p>${demoPicker()}<button class="btn ghost full" data-act="demoreset">${ic('trash',18)} Borrar lo que hice en prueba</button><button class="btn full" data-act="logout">${ic('logout',18,'var(--on-primary)')} Salir del modo de prueba</button>`);return}sheet(`<div class="eyebrow">Mi cuenta</div><h2 style="font-size:26px">${esc(a.name)}</h2><p class="muted" style="font-weight:700">${ROLE_N[a.role]} · ${accDetail(a)}<br>${esc(a.email)}</p>${a.role==='alumno'?`<p class="hint">${(t=>t?'Tu maestro: '+esc(t.name):'Tu salón todavía no tiene maestro registrado')(teacherOf(a.sec,a.grp))}</p>`:''}${a.role==='familia'?'<p class="hint">Tu cuenta está ligada a tu hijo o hija y solo ves su información.</p>':''}<p class="hint">El rol de cada cuenta lo define el registro y no se puede cambiar. Para ver la app como otra persona, cierra sesión y entra con otra cuenta.</p><button class="btn ghost full" data-act="logout">${ic('logout',18)} Cerrar sesión</button>`)}
 function setAccount(id,keepSheet){S.cur=id;bind();DB.remember();ptab={familia:'hijo',maestro:'validar',admin:'revisar'}[S.role]||null;skipped=[];filter='parati';if(S.role==='alumno'&&!S.visits.includes(dayKey()))S.visits.push(dayKey());save();if(!keepSheet)closeSheet();renderAll(true);window.scrollTo(0,0)}
 function setRole(r){rolesSheet()}
 function notifSheet(){S.notifs.forEach(n=>n.read=true);save();renderChrome();
@@ -1625,7 +1650,15 @@ function famBody(fv){const n=approved().length;
  ${S.mySec==='Prepa'?`<section class="card stack"><b>Servicio social</b><div class="bar"><span style="width:${Math.min(100,hrsOk()/S.settings.metaHoras*100)}%"></span></div><p class="hint">${hrsOk()} de ${S.settings.metaHoras} horas confirmadas</p></section>`:''}
  <section class="card"><b>Últimas acciones</b>${S.subs.length?S.subs.slice().reverse().slice(0,8).map(s=>`<div class="hist"><p><b>${esc(s.title)}</b><br><span class="hint">${esc(valLabel(s)||(s.rid&&reto(s.rid)&&reto(s.rid).trk?TRK[reto(s.rid).trk]:'Acción propia'))}</span></p>${statusPill(s.status)}</div>`).join(''):'<p class="hint" style="margin-top:6px">Todavía no hay acciones. Propónganle un reto en familia.</p>'}</section>`;
  if(ptab==='validar')return `<p class="muted" style="font-weight:700">Retos de casa y de festividades que hizo ${esc(S.name)}. Si los viste, confírmalos: así coordinación sabe que pasaron.</p>`+(fv.length?fv.map(s=>`<article class="card stack" style="gap:8px"><div class="row" style="justify-content:space-between">${catChip(s.cat)}<span class="hint">${new Date(s.at).toLocaleDateString('es-MX',{day:'numeric',month:'short'})}</span></div><b style="font-size:18px">${esc(s.title)}</b><p style="font-weight:600">«${esc(s.text)}»</p>${s.photo?`<div class="ph"><img src="${s.photo}" alt="Foto que adjuntó"></div>`:''}<div class="row"><button class="btn ghost small" style="flex:1" data-act="val" data-id="${s.id}" data-ok="0">No me consta</button><button class="btn small" style="flex:1" data-act="val" data-id="${s.id}" data-ok="1">${ic('check',18)} Sí, lo vi</button></div></article>`).join(''):emptyCard('Nada por confirmar','Cuando cuente un reto de casa, aparecerá aquí.'));
- if(ptab==='retos'){const L=allR().filter(r=>fitsMe(r)&&r.trk==='casa'&&r.lvl<=lvlOf('casa'));return `<p class="muted" style="font-weight:700">Proponle a ${esc(S.name)} un reto para hacer juntos. Le llega directo a su bolsa.</p>`+L.map(r=>{const st=stOf(r.id);return `<article class="card stack" style="gap:6px"><div class="row" style="justify-content:space-between">${catChip(r.cat)}<span class="hint">Nivel ${r.lvl} · +${r.pts}</span></div><b style="font-size:17px">${esc(r.t)}</b><p class="hint">${esc(r.d)}</p>${st==='none'?`<button class="btn small" data-act="propose" data-id="${r.id}">Proponérselo</button>`:`<span>${st==='done'?statusPill('approved'):'<span class="status pending">En su bolsa</span>'}</span>`}</article>`}).join('')}
+ if(ptab==='retos'){const L=allR().filter(r=>!r.kid&&fitsMe(r)&&r.trk==='casa'&&r.lvl<=lvlOf('casa')),M=S.custom.filter(r=>r.kid&&r.kid===curSid());return `<section class="card stack"><b style="font-size:19px">${ic('plus',18)} Crea un reto para ${esc(S.name)}</b><p class="hint">Solo lo ve ${esc(S.name)}. Cuando lo haga y lo cuente, tú lo confirmas y coordinación da las gotas.</p><form class="stack" id="ffam">
+ <label class="f" for="fr-t">Título<input class="in" id="fr-t" required minlength="4" maxlength="60" placeholder="Ej.: Ayuda a poner la mesa de Shabat"></label>
+ <label class="f" for="fr-d">¿Qué tiene que hacer?<textarea class="in" id="fr-d" required minlength="10" maxlength="300"></textarea></label>
+ <div class="row"><label class="f" for="fr-k" style="flex:1;min-width:0">Camino<select class="in" id="fr-k"><option value="casa">En casa</option><option value="rapido">5 minutos</option></select></label><label class="f" for="fr-l" style="flex:1;min-width:0">Dificultad<select class="in" id="fr-l">${[1,2,3].map(l=>`<option value="${l}">${l} · ${LV[l]} (+${LVP[l]})</option>`).join('')}</select></label><label class="f" for="fr-m" style="flex:1;min-width:0">Minutos<input class="in" id="fr-m" type="number" min="1" max="240" value="15"></label></div>
+ <label class="f" for="fr-c">Tema<select class="in" id="fr-c">${Object.keys(CAT).map(c=>`<option value="${c}" ${c==='Familia'?'selected':''}>${CATN[c]}</option>`).join('')}</select></label>
+ <b>Cómo hacerlo (opcional)</b>${[0,1,2].map(i=>`<input class="in" id="fr-h${i}" maxlength="140" placeholder="Paso ${i+1}" aria-label="Paso ${i+1}">`).join('')}
+ <button class="btn full">${ic('heart',18,'var(--on-primary)')} Ponerle este reto</button></form></section>`
+ +(M.length?`<section class="stack" style="gap:8px"><b>Retos que le pusiste · ${M.length}</b>${M.map(r=>{const st=stOf(r.id);return `<article class="card stack" style="gap:6px"><div class="row" style="justify-content:space-between">${catChip(r.cat)}<span class="hint">${TRKS[r.trk]} · +${r.pts}</span></div><b style="font-size:17px">${esc(r.t)}</b><p class="hint">${esc(r.d)}</p><div class="row" style="justify-content:space-between;align-items:center">${st==='done'?statusPill('approved'):st==='review'?'<span class="status pending">Lo está revisando</span>':'<span class="status pending">Por hacer</span>'}${st==='none'?`<button class="btn ghost small" data-act="famdel" data-id="${r.id}">${ic('trash',16)} Quitar</button>`:''}</div></article>`}).join('')}</section>`:'')
+ +`<p class="muted" style="font-weight:700;margin-top:6px">O proponle uno del catálogo para hacer juntos:</p>`+L.map(r=>{const st=stOf(r.id);return `<article class="card stack" style="gap:6px"><div class="row" style="justify-content:space-between">${catChip(r.cat)}<span class="hint">Nivel ${r.lvl} · +${r.pts}</span></div><b style="font-size:17px">${esc(r.t)}</b><p class="hint">${esc(r.d)}</p>${st==='none'?`<button class="btn small" data-act="propose" data-id="${r.id}">Proponérselo</button>`:`<span>${st==='done'?statusPill('approved'):'<span class="status pending">En su bolsa</span>'}</span>`}</article>`}).join('')}
  if(ptab==='permisos')return `<p class="muted" style="font-weight:700">Como familia decides qué se comparte de ${esc(S.name)}. Puedes cambiarlo cuando quieras.</p><section class="card stack">${[['fotos','Puede subir fotos como evidencia'],['nombre','Su nombre puede aparecer en Comunidad'],['top','Puede aparecer en el Top 10']].map(([k,l])=>`<label class="check" for="cs-${k}"><input type="checkbox" id="cs-${k}" data-consent="${k}" ${S.consent[k]?'checked':''}> ${l}</label>`).join('')}</section><p class="hint">Los cambios se guardan al momento.</p>`;
  if(ptab==='avisos')return avisoList();return ''}
 function classList(){const w0=Date.now()-7*86400000;return studsAll().filter(a=>a.sec===S.mySec&&a.grp===myGroup()).map(a=>{const ap=(S.studs[a.id]?S.studs[a.id].subs:[]).filter(s=>s.status==='approved');return{id:a.id,n:a.name,g:ap.reduce((x,s)=>x+s.pts,0),wk:ap.some(s=>(s.at||0)>=w0),me:true}}).sort((a,b)=>b.g-a.g)}
@@ -1705,7 +1738,9 @@ document.addEventListener('click',e=>{const t=e.target.closest('[data-act]');if(
  
  case 'roles':rolesSheet();break;
  case 'setrole':setRole(id);break;
- case 'logout':DB.signOut().then(()=>{S=fresh();S.cur=null;S.logged=false;ptab=null;closeSheet();renderAll(true);window.scrollTo(0,0);toast('Cerraste sesión.')});break;
+ case 'demo':enterDemo(id);break;
+ case 'demoreset':try{localStorage.removeItem('mj-demo')}catch(x){}{const c=S.cur;S=demoFresh();setAccount(c)}toast('Listo: la prueba empezó de cero.');break;
+ case 'logout':if(DEMO){exitDemo();break}DB.signOut().then(()=>{S=fresh();S.cur=null;S.logged=false;ptab=null;closeSheet();renderAll(true);window.scrollTo(0,0);toast('Cerraste sesión.')});break;
  case 'ptab':ptab=id;renderAll(true);break;
  case 'bag':bagSheet();break;
  case 'notifs':notifSheet();break;
@@ -1714,6 +1749,7 @@ document.addEventListener('click',e=>{const t=e.target.closest('[data-act]');if(
  case 'cert':certSheet();break;
  case 'speak':{const r=reto(n);if(r)speak(`${r.t}. ${r.d.replace(/[.!?]?$/,'.')} Cómo hacerlo. ${howOf(r).map((x,i)=>`${['Primero','Después','Al final'][i]||'Luego'}: ${x.replace(/[.!?]?$/,'.')}`).join(' ')}`);break}
  case 'val':validate(id,t.dataset.ok==='1');break;
+ case 'famdel':S.custom=S.custom.filter(x=>!(x.id===n&&x.kid&&x.kid===curSid()));save();renderAll();toast('Reto quitado.');break;
  case 'propose':notify(`Tu familia te propuso un reto: «${reto(n).t}». Cuando lo hagan juntos, cuéntalo con «¡Lo hago!».`);save();renderAll();toast('Listo: le avisamos que se lo propusiste.');break;
  case 'remind':if(!S.remind.includes(id)){S.remind.push(id);notify('Tu maestro te recuerda: ¡esta semana todavía puedes sumar tu gota!',id)}save();renderAll();toast('Recordatorio enviado: le llega a su campana.');break;
  case 'hrs':{const h=S.hours.find(x=>x.id===id),ok=t.dataset.ok==='1';h.status=ok?'approved':'rejected';S.log.push({title:`Servicio social: ${h.org} (${h.hrs} h)`,status:h.status,comment:'',by:'Coordinación',at:Date.now()});notify(ok?`Confirmaron ${h.hrs} h de servicio social en ${h.org}.`:`Revisa tu registro de horas en ${h.org}.`,h.owner);save();renderAll();toast(ok?'Horas confirmadas.':'Registro rechazado.');break}
@@ -1767,6 +1803,7 @@ document.addEventListener('submit',async e=>{e.preventDefault();
  if(e.target.id==='fforgot'){const m=document.getElementById('fg-mail').value.trim().toLowerCase(),er=document.getElementById('fg-err');try{await DB.resetPassword(m);sheet(`<div class="eyebrow">Revisa tu correo</div><h2 style="font-size:26px">📬 Te mandamos un link</h2><p class="muted" style="font-weight:700">Si <b>${esc(m)}</b> tiene cuenta, te llegará un correo para crear una contraseña nueva. Revisa también spam.</p><button class="btn full" data-act="close">Entendido</button>`)}catch(x){er.textContent=x.message}return}
  if(e.target.id==='fnewpass'){const a=document.getElementById('np-1').value,b2=document.getElementById('np-2').value,er=document.getElementById('np-err');if(a!==b2){er.textContent='Las contraseñas no coinciden.';return}try{await DB.newPassword(a);history.replaceState(null,'',location.pathname);closeSheet();toast('¡Listo! Tu contraseña se cambió.');if(!S.logged&&await DB.start())setAccount(S.cur)}catch(x){er.textContent=x.message}return}
  if(e.target.id==='finv'){const [sc,gr]=document.getElementById('iv-s').value.split('|');if(teacherOf(sc,gr)){toast(`${gr} de ${SEC[sc]} ya tiene maestro.`);return}const AB='ABCDEFGHJKLMNPQRSTUVWXYZ23456789',rnd=[...crypto.getRandomValues(new Uint8Array(6))].map(b=>AB[b%AB.length]).join(''),code='MJ-'+gr.replace(/[^0-9A-Za-z]/g,'').replace('º','').toUpperCase()+'-'+rnd;S.invites.push({code,sec:sc,grp:gr,used:null,at:Date.now()});S.log.push({title:'Clave de maestro creada',status:'approved',comment:code+' · '+SEC[sc]+' '+gr,by:'Coordinación',at:Date.now()});save();renderAll();toast('Clave creada: '+code)}
+ if(e.target.id==='ffam'){const g=k=>document.getElementById(k).value.trim(),lv=+g('fr-l')||1,sid=curSid();if(!sid)return;const r={id:200000+Date.now()%700000,kid:sid,by:'familia',sec:S.mySec,cat:g('fr-c')||'Familia',trk:g('fr-k')==='rapido'?'rapido':'casa',lvl:lv,min:+g('fr-m')||15,pts:LVP[lv],t:g('fr-t'),d:g('fr-d'),how:[0,1,2].map(i=>g('fr-h'+i)).filter(Boolean),dim:'P',val:'kibud',obj:'Un reto que te puso tu familia.'};if(!r.how.length)delete r.how;S.custom.push(r);notify(`Tu familia te puso un reto: «${r.t}». Búscalo en tu baraja y cuéntalo con «¡Lo hago!».`,sid);save();renderAll();toast('Listo: ya le aparece en su baraja.');return}
  if(e.target.id==='fret'){const g=k=>document.getElementById(k).value.trim(),id=g('re-id'),a=g('re-a'),lv=+g('re-l')||1,o={t:g('re-t'),d:g('re-d'),cat:g('re-c'),min:+g('re-m')||10,obj:g('re-o'),dim:g('re-dm'),val:g('re-v'),how:[0,1,2].map(i=>g('re-h'+i)).filter(Boolean)};
   if(a==='fiesta')Object.assign(o,{fest:g('re-f'),pts:+g('re-p')||20,sec:undefined,trk:undefined,lvl:undefined});else Object.assign(o,{sec:a.startsWith('Primaria')?'Primaria':a,band:a.startsWith('Primaria-')?a.split('-')[1]:undefined,trk:g('re-k'),lvl:lv,pts:LVP[lv],fest:undefined});
   if(!o.how.length)o.how=undefined;
@@ -1785,7 +1822,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape'&&document.querySelec
 
 /* ---------- Inicio ---------- */
 function seedVisits(){}
-(async function boot(){renderAll(true);route();const ok=await DB.start();if(ok){setAccount(S.cur,true);const SS=(()=>{try{return JSON.parse(sessionStorage.getItem('mj-sesion')||'null')}catch(e){return null}})();/* al refrescar te quedas donde estabas */if(SS){if(SS.ptab)ptab=SS.ptab;if(SS.filter)filter=SS.filter;renderAll(true);requestAnimationFrame(()=>scrollTo(0,SS.y||0))}}else{renderAll(true);if(DB.needReg())askReg()}if(DB.recovery)newPassSheet();
+(async function boot(){renderAll(true);route();const ok=await DB.start();if(ok){setAccount(S.cur,true);const SS=(()=>{try{return JSON.parse(sessionStorage.getItem('mj-sesion')||'null')}catch(e){return null}})();/* al refrescar te quedas donde estabas */if(SS){if(SS.ptab)ptab=SS.ptab;if(SS.filter)filter=SS.filter;renderAll(true);requestAnimationFrame(()=>scrollTo(0,SS.y||0))}}else{const dc=(()=>{try{return sessionStorage.getItem('mj-demo-cur')}catch(e){return null}})();if(dc&&!DB.needReg()&&!DB.recovery){enterDemo(dc,true);const SS=(()=>{try{return JSON.parse(sessionStorage.getItem('mj-sesion')||'null')}catch(e){return null}})();if(SS){if(SS.ptab)ptab=SS.ptab;if(SS.filter)filter=SS.filter;renderAll(true);requestAnimationFrame(()=>scrollTo(0,SS.y||0))}}else{renderAll(true);if(DB.needReg())askReg()}}if(DB.recovery)newPassSheet();
  const keepSesion=()=>{try{if(S.logged)sessionStorage.setItem('mj-sesion',JSON.stringify({ptab,filter,y:lockY!==null?lockY:scrollY}));else sessionStorage.removeItem('mj-sesion')}catch(e){}};addEventListener('pagehide',keepSesion);addEventListener('beforeunload',keepSesion);document.addEventListener('visibilitychange',keepSesion);setInterval(keepSesion,2000);
  document.addEventListener('visibilitychange',()=>{if(!document.hidden&&S.logged&&DB.stale())DB.reload(true)});setInterval(()=>{if(!document.hidden&&S.logged&&!document.querySelector('.sheet'))DB.reload(true)},60000);
  storyTimer=setInterval(()=>{storyIdx++;showStory()},5000)})();
