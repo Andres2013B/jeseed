@@ -121,25 +121,43 @@ alter table public.mj_subs enable row level security;
 drop policy if exists "mj_subs: leer" on public.mj_subs;
 create policy "mj_subs: leer" on public.mj_subs for select to authenticated
   using (status = 'approved' or public.mj_can_see(owner));
+-- ¿Puedo registrar retos por este alumno? (su familia o su maestro, solo Kínder y Primaria)
+create or replace function public.mj_can_log(sid uuid) returns boolean
+language sql stable security definer set search_path = public as $$
+  select exists (select 1 from public.mj_accounts me join public.mj_accounts s on s.id = sid
+                 where me.id = auth.uid() and s.role = 'alumno' and s.sec in ('Kinder', 'Primaria')
+                   and ((me.role = 'familia' and me.child = s.id)
+                        or (me.role = 'maestro' and me.status = 'approved' and me.sec = s.sec and me.grp = s.grp)));
+$$;
+grant execute on function public.mj_can_log(uuid) to authenticated;
+
 drop policy if exists "mj_subs: enviar" on public.mj_subs;
 create policy "mj_subs: enviar" on public.mj_subs for insert to authenticated
-  with check (owner = auth.uid() and exists (select 1 from public.mj_accounts where id = auth.uid() and role = 'alumno'));
+  with check ((owner = auth.uid() and exists (select 1 from public.mj_accounts where id = auth.uid() and role = 'alumno'))
+              or public.mj_can_log(owner));
 drop policy if exists "mj_subs: cambiar" on public.mj_subs;
 create policy "mj_subs: cambiar" on public.mj_subs for update to authenticated
   using (public.mj_can_see(owner)) with check (public.mj_can_see(owner));
 
 create or replace function public.mj_subs_before_insert() returns trigger
 language plpgsql security definer set search_path = public as $$
+declare me public.mj_accounts := public.mj_me();
 begin
-  new.owner := auth.uid();
+  if new.owner is not null and new.owner <> auth.uid() and public.mj_can_log(new.owner) then
+    -- Lo registra su familia o su maestro: ya cuenta como confirmado
+    new.val := jsonb_build_object('by', me.role, 'ok', true, 'at', (extract(epoch from now()) * 1000)::bigint, 'name', me.name);
+    new.data := (new.data - 'comment') || jsonb_build_object('logBy', jsonb_build_object('role', me.role, 'name', me.name));
+  else
+    new.owner := auth.uid();
+    new.val := null;
+    new.data := new.data - 'comment' - 'logBy';
+  end if;
   new.status := 'pending';
-  new.val := null;
   new.pts := least(greatest(coalesce(new.pts, 1), 1), 3);
-  new.sec := (select sec from public.mj_accounts where id = auth.uid());
-  new.data := new.data - 'comment';
+  new.sec := (select sec from public.mj_accounts where id = new.owner);
   new.at := now();
   new.updated_at := now();
-  if (select count(*) from public.mj_subs where owner = auth.uid() and at > now() - interval '1 day') >= 10 then
+  if (select count(*) from public.mj_subs where owner = new.owner and at > now() - interval '1 day') >= 10 then
     raise exception 'Llegaste al límite de acciones por hoy. ¡Mañana puedes seguir!';
   end if;
   return new;
@@ -201,10 +219,19 @@ create table if not exists public.mj_hours (
 alter table public.mj_hours enable row level security;
 drop policy if exists "mj_hours: leer" on public.mj_hours;
 create policy "mj_hours: leer" on public.mj_hours for select to authenticated using (public.mj_can_see(owner));
+-- ¿Coordinación ya autorizó el proyecto de servicio social de este alumno?
+create or replace function public.mj_ss_ok() returns boolean
+language plpgsql stable security definer set search_path = public as $$
+begin
+  return exists (select 1 from public.mj_items i where i.kind = 'ss' and i.id = auth.uid()::text
+                 and i.data ->> 'status' = 'approved');
+end $$;
+grant execute on function public.mj_ss_ok() to authenticated;
 drop policy if exists "mj_hours: registrar" on public.mj_hours;
 create policy "mj_hours: registrar" on public.mj_hours for insert to authenticated
-  with check (owner = auth.uid() and status = 'pending'
-              and exists (select 1 from public.mj_accounts where id = auth.uid() and role = 'alumno'));
+  with check (owner = auth.uid() and status = 'pending' and (data ->> 'photo') is not null
+              and exists (select 1 from public.mj_accounts where id = auth.uid() and role = 'alumno')
+              and public.mj_ss_ok());
 drop policy if exists "mj_hours: confirmar" on public.mj_hours;
 create policy "mj_hours: confirmar" on public.mj_hours for update to authenticated
   using (public.mj_is_admin()) with check (public.mj_is_admin());
@@ -230,19 +257,22 @@ create policy "mj_notifs: leídas" on public.mj_notifs for update to authenticat
 -- ---------------------------------------------------------- Avisos, propuestas, registro, destacados, retos nuevos
 -- kind: aviso | proposal | log | remind | featured | custom
 create table if not exists public.mj_items (
-  kind text not null check (kind in ('aviso', 'proposal', 'log', 'remind', 'featured', 'custom')),
+  kind text not null check (kind in ('aviso', 'proposal', 'log', 'remind', 'featured', 'custom', 'ss')),
   id text not null check (char_length(id) <= 60),
   author uuid default auth.uid() references public.mj_accounts (id) on delete set null,
   data jsonb not null default '{}'::jsonb,
   created_at timestamptz not null default now(),
   primary key (kind, id)
 );
+alter table public.mj_items drop constraint if exists mj_items_kind_check;
+alter table public.mj_items add constraint mj_items_kind_check
+  check (kind in ('aviso', 'proposal', 'log', 'remind', 'featured', 'custom', 'ss'));
 alter table public.mj_items enable row level security;
 drop policy if exists "mj_items: leer" on public.mj_items;
 create policy "mj_items: leer" on public.mj_items for select to authenticated using (
   kind in ('aviso', 'featured')
-  or (kind = 'custom' and (data ->> 'kid' is null
-      or exists (select 1 from public.mj_accounts k where k.id::text = data ->> 'kid' and public.mj_can_see(k.id))))
+  or (kind = 'custom' and (data ->> 'forStud' is null
+      or exists (select 1 from public.mj_accounts k where k.id::text = data ->> 'forStud' and public.mj_can_see(k.id))))
   or public.mj_is_admin()
   or author = auth.uid()
   or (kind = 'proposal' and data ->> 'status' = 'approved'));
@@ -251,9 +281,12 @@ create policy "mj_items: crear" on public.mj_items for insert to authenticated w
   author = auth.uid() and (
     public.mj_is_admin()
     or kind = 'log'
-    -- la familia puede crear retos solo para su propio hijo o hija
-    or (kind = 'custom' and (public.mj_me()).role = 'familia' and (public.mj_me()).child is not null
-        and data ->> 'kid' = (public.mj_me()).child::text)
+    -- la familia propone retos solo para su hijo o hija; coordinación los autoriza
+    or (kind = 'proposal' and (public.mj_me()).role = 'familia' and (public.mj_me()).child is not null
+        and data ->> 'forStud' = (public.mj_me()).child::text and coalesce(data ->> 'status', 'pending') = 'pending')
+    -- proyecto de servicio social del alumno de Prepa (uno por alumno)
+    or (kind = 'ss' and id = auth.uid()::text and (public.mj_me()).role = 'alumno' and (public.mj_me()).sec = 'Prepa'
+        and data ->> 'status' = 'pending')
     or (kind = 'proposal' and (public.mj_me()).role in ('alumno', 'maestro') and coalesce(data ->> 'status', 'pending') = 'pending')
     or (kind in ('aviso', 'remind') and (public.mj_me()).role = 'maestro' and (public.mj_me()).status = 'approved'
         and (kind = 'remind' or (data ->> 'to' = (public.mj_me()).grp and data ->> 'sec' = (public.mj_me()).sec)))
@@ -262,8 +295,12 @@ drop policy if exists "mj_items: coordinación" on public.mj_items;
 create policy "mj_items: coordinación" on public.mj_items for update to authenticated
   using (public.mj_is_admin()) with check (public.mj_is_admin());
 drop policy if exists "mj_items: borrar" on public.mj_items;
-create policy "mj_items: borrar" on public.mj_items for delete to authenticated using (
-  public.mj_is_admin() or (kind = 'custom' and author = auth.uid() and data ->> 'kid' is not null));
+create policy "mj_items: borrar" on public.mj_items for delete to authenticated using (public.mj_is_admin());
+-- El alumno puede corregir su proyecto de servicio social si coordinación pidió ajustes
+drop policy if exists "mj_items: ajustar servicio" on public.mj_items;
+create policy "mj_items: ajustar servicio" on public.mj_items for update to authenticated
+  using (kind = 'ss' and author = auth.uid() and data ->> 'status' = 'rejected')
+  with check (kind = 'ss' and author = auth.uid() and data ->> 'status' = 'pending');
 
 -- ---------------------------------------------------------- Claves de maestro
 create table if not exists public.mj_invites (
