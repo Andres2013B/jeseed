@@ -186,7 +186,27 @@ begin
       raise exception 'Esta acción ya está en revisión o fue aprobada.';
     end if;
     new.pts := old.pts; new.val := null; new.at := now();
-    new.data := (new.data - 'comment');
+    new.data := (new.data - 'comment' - 'decBy');
+    return new;
+  end if;
+
+  -- Maestro: autoriza o regresa solo los retos DEL COLEGIO de alumnos de su salón
+  if me.role = 'maestro' and new.status is distinct from old.status then
+    if me.status <> 'approved' or not exists (select 1 from public.mj_accounts s where s.id = old.owner and s.role = 'alumno'
+                                              and s.sec = me.sec and s.grp = me.grp) then
+      raise exception 'Ese alumno no es de tu salón.';
+    end if;
+    if old.status <> 'pending' or new.status not in ('approved', 'rejected') then
+      raise exception 'Este reto ya fue revisado.';
+    end if;
+    if coalesce(old.data ->> 'trk', '') <> 'colegio' then
+      raise exception 'Solo puedes autorizar retos del colegio. Los demás los autoriza coordinación.';
+    end if;
+    new.pts := old.pts; new.at := old.at; new.val := old.val; new.show_photo := old.show_photo;
+    new.data := old.data || jsonb_build_object('comment', coalesce(new.data ->> 'comment', ''),
+                                               'decBy', jsonb_build_object('role', 'maestro', 'name', me.name));
+    if new.status = 'approved' and not new.show_photo then new.photo := null; end if;
+    if new.status = 'rejected' then new.photo := case when new.show_photo then new.photo end; end if;
     return new;
   end if;
 
