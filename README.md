@@ -6,7 +6,7 @@ una gota que llena el manantial del colegio.
 
 Publicada en: https://andres2013b.github.io/jeseed/
 
-Creada por Andrés Braverman y Nathan Jaschkowitz.
+Creada por Andrés Braverman.
 
 ## Roles
 - **Alumno**: se registra con su correo del colegio, elige sección y salón.
