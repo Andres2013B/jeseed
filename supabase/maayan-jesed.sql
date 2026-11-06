@@ -274,10 +274,23 @@ drop policy if exists "mj_notifs: leídas" on public.mj_notifs;
 create policy "mj_notifs: leídas" on public.mj_notifs for update to authenticated
   using (public.mj_is_self_or_family(owner)) with check (public.mj_is_self_or_family(owner));
 
+-- ¿Todavía hay lugar en esta oportunidad de «Necesito una mano»?
+create or replace function public.mj_help_room(opp text) returns boolean
+language plpgsql stable security definer set search_path = public as $$
+declare cupo int; fecha text; n int;
+begin
+  select (data ->> 'cupo')::int, data ->> 'date' into cupo, fecha from public.mj_items where kind = 'help' and id = opp;
+  if not found or cupo is null then return false; end if;
+  if fecha is not null and fecha <> '' and fecha < to_char(now() at time zone 'America/Mexico_City', 'YYYY-MM-DD') then return false; end if;
+  select count(*) into n from public.mj_items where kind = 'helpjoin' and data ->> 'opp' = opp;
+  return n < cupo;
+end $$;
+grant execute on function public.mj_help_room(text) to authenticated;
+
 -- ---------------------------------------------------------- Avisos, propuestas, registro, destacados, retos nuevos
 -- kind: aviso | proposal | log | remind | featured | custom
 create table if not exists public.mj_items (
-  kind text not null check (kind in ('aviso', 'proposal', 'log', 'remind', 'featured', 'custom', 'ss')),
+  kind text not null check (kind in ('aviso', 'proposal', 'log', 'remind', 'featured', 'custom', 'ss', 'help', 'helpjoin')),
   id text not null check (char_length(id) <= 60),
   author uuid default auth.uid() references public.mj_accounts (id) on delete set null,
   data jsonb not null default '{}'::jsonb,
@@ -286,11 +299,11 @@ create table if not exists public.mj_items (
 );
 alter table public.mj_items drop constraint if exists mj_items_kind_check;
 alter table public.mj_items add constraint mj_items_kind_check
-  check (kind in ('aviso', 'proposal', 'log', 'remind', 'featured', 'custom', 'ss'));
+  check (kind in ('aviso', 'proposal', 'log', 'remind', 'featured', 'custom', 'ss', 'help', 'helpjoin'));
 alter table public.mj_items enable row level security;
 drop policy if exists "mj_items: leer" on public.mj_items;
 create policy "mj_items: leer" on public.mj_items for select to authenticated using (
-  kind in ('aviso', 'featured')
+  kind in ('aviso', 'featured', 'help', 'helpjoin')
   or (kind = 'custom' and (data ->> 'forStud' is null
       or exists (select 1 from public.mj_accounts k where k.id::text = data ->> 'forStud' and public.mj_can_see(k.id))))
   or public.mj_is_admin()
@@ -304,6 +317,10 @@ create policy "mj_items: crear" on public.mj_items for insert to authenticated w
     -- la familia propone retos solo para su hijo o hija; coordinación los autoriza
     or (kind = 'proposal' and (public.mj_me()).role = 'familia' and (public.mj_me()).child is not null
         and data ->> 'forStud' = (public.mj_me()).child::text and coalesce(data ->> 'status', 'pending') = 'pending')
+    -- «Necesito una mano»: los maestros publican oportunidades; los alumnos se apuntan si hay lugar
+    or (kind = 'help' and (public.mj_me()).role = 'maestro' and (public.mj_me()).status = 'approved')
+    or (kind = 'helpjoin' and (public.mj_me()).role = 'alumno'
+        and id = left((data ->> 'opp') || ':' || auth.uid()::text, 60) and public.mj_help_room(data ->> 'opp'))
     -- proyecto de servicio social del alumno de Prepa (uno por alumno)
     or (kind = 'ss' and id = auth.uid()::text and (public.mj_me()).role = 'alumno' and (public.mj_me()).sec = 'Prepa'
         and data ->> 'status' = 'pending')
@@ -315,7 +332,8 @@ drop policy if exists "mj_items: coordinación" on public.mj_items;
 create policy "mj_items: coordinación" on public.mj_items for update to authenticated
   using (public.mj_is_admin()) with check (public.mj_is_admin());
 drop policy if exists "mj_items: borrar" on public.mj_items;
-create policy "mj_items: borrar" on public.mj_items for delete to authenticated using (public.mj_is_admin());
+create policy "mj_items: borrar" on public.mj_items for delete to authenticated using (
+  public.mj_is_admin() or (kind in ('help', 'helpjoin') and author = auth.uid()));
 -- El alumno puede corregir su proyecto de servicio social si coordinación pidió ajustes
 drop policy if exists "mj_items: ajustar servicio" on public.mj_items;
 create policy "mj_items: ajustar servicio" on public.mj_items for update to authenticated
