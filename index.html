@@ -2462,11 +2462,12 @@ function passportHTML(compact){const st=passStamps(),F=uniqFest(),n=F.filter(f=>
 function passportSheet(){sheet(`${passportHTML(false)}<button class="btn full" onclick="window.print()">${ic('down',18)} Imprimir mi pasaporte</button>`)}
 
 /* ---------- Retos en pareja ---------- */
-const mates=()=>S.role==='alumno'?studsAll().filter(a=>a.id!==curSid()&&a.sec===S.mySec&&a.grp===myGroup()):[];
+const gradeOf=g=>String(g||'').replace(/\s*[A-Za-z]$/,'').trim();
+const mates=()=>S.role==='alumno'?studsAll().filter(a=>a.id!==curSid()&&a.sec===S.mySec&&gradeOf(a.grp)===gradeOf(myGroup())).sort((x,y)=>(x.grp===myGroup()?0:1)-(y.grp===myGroup()?0:1)||String(x.name).localeCompare(String(y.name))):[];
 function pairField(){if(S.role!=='alumno'||D.resend)return '';
  if(D.pairOf&&D.pairWithInv)return `<div class="notice">${ic('users',16)} Lo cuentas en pareja con <b>${esc(D.pairWithInv.name||'tu compañero')}</b>. Cada quien gana sus gotas cuando lo aprueban.</div>`;
  const M=mates();if(!M.length)return '';
- return `<label class="f" for="d-pair">¿Lo hiciste con alguien de tu salón? (opcional)<select class="in" id="d-pair"><option value="">Lo hice yo</option>${M.map(a=>`<option value="${a.id}" ${D.pair===a.id?'selected':''}>${esc(a.name)}</option>`).join('')}</select></label><p class="hint">Le llega una invitación. Si la acepta y cuenta su parte, los dos ganan gotas cuando lo aprueben.</p>`}
+ return `<label class="f" for="d-pair">¿Lo hiciste con alguien de tu grado? (opcional)<select class="in" id="d-pair"><option value="">Lo hice yo</option>${M.map(a=>`<option value="${a.id}" ${D.pair===a.id?'selected':''}>${esc(a.name)}${a.grp?' · '+esc(a.grp):''}</option>`).join('')}</select></label><p class="hint">Le llega una invitación. Si la acepta y cuenta su parte, los dos ganan gotas cuando lo aprueben.</p>`}
 function pairData(){if(D.pair){const a=stuAcc(D.pair)||{};return {pairWith:{id:D.pair,name:a.name||''}}}if(D.pairOf&&D.pairWithInv)return {pairWith:D.pairWithInv,pairOf:D.pairOf};return {}}
 function pairSend(nid){if(!D.pair||D.pairOf)return;S.pairs=S.pairs||[];S.pairs.push({id:'pr'+Date.now()+Math.random().toString(36).slice(2,6),to:D.pair,from:S.cur,fromName:S.name,rid:D.rid||null,title:D.title||'',cat:D.cat||'Amigos',sub:nid,at:Date.now()})}
 const pairNoKey=()=>'mj-pairno-'+(S.cur||'x');

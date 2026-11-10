@@ -275,11 +275,13 @@ create policy "mj_notifs: leídas" on public.mj_notifs for update to authenticat
   using (public.mj_is_self_or_family(owner)) with check (public.mj_is_self_or_family(owner));
 
 -- ¿Ese alumno es de mi mismo salón? (para invitar a un reto en pareja)
+-- Mismo grado (2.º A y 2.º C cuentan como 2.º) y misma sección
 create or replace function public.mj_same_salon(other text) returns boolean
 language sql stable security definer set search_path = public as $$
   select exists (select 1 from public.mj_accounts me join public.mj_accounts m on m.id::text = other
                  where me.id = auth.uid() and me.role = 'alumno' and m.role = 'alumno' and m.id <> me.id
-                   and m.status = 'approved' and m.sec = me.sec and m.grp = me.grp);
+                   and m.status = 'approved' and m.sec = me.sec
+                   and regexp_replace(coalesce(m.grp, ''), '\s*[A-Za-z]$', '') = regexp_replace(coalesce(me.grp, ''), '\s*[A-Za-z]$', ''));
 $$;
 grant execute on function public.mj_same_salon(text) to authenticated;
 
