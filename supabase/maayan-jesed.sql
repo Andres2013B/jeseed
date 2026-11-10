@@ -274,6 +274,15 @@ drop policy if exists "mj_notifs: leídas" on public.mj_notifs;
 create policy "mj_notifs: leídas" on public.mj_notifs for update to authenticated
   using (public.mj_is_self_or_family(owner)) with check (public.mj_is_self_or_family(owner));
 
+-- ¿Ese alumno es de mi mismo salón? (para invitar a un reto en pareja)
+create or replace function public.mj_same_salon(other text) returns boolean
+language sql stable security definer set search_path = public as $$
+  select exists (select 1 from public.mj_accounts me join public.mj_accounts m on m.id::text = other
+                 where me.id = auth.uid() and me.role = 'alumno' and m.role = 'alumno' and m.id <> me.id
+                   and m.status = 'approved' and m.sec = me.sec and m.grp = me.grp);
+$$;
+grant execute on function public.mj_same_salon(text) to authenticated;
+
 -- ¿Todavía hay lugar en esta oportunidad de «Necesito una mano»?
 create or replace function public.mj_help_room(opp text) returns boolean
 language plpgsql stable security definer set search_path = public as $$
@@ -290,7 +299,7 @@ grant execute on function public.mj_help_room(text) to authenticated;
 -- ---------------------------------------------------------- Avisos, propuestas, registro, destacados, retos nuevos
 -- kind: aviso | proposal | log | remind | featured | custom
 create table if not exists public.mj_items (
-  kind text not null check (kind in ('aviso', 'proposal', 'log', 'remind', 'featured', 'custom', 'ss', 'help', 'helpjoin')),
+  kind text not null check (kind in ('aviso', 'proposal', 'log', 'remind', 'featured', 'custom', 'ss', 'help', 'helpjoin', 'pair')),
   id text not null check (char_length(id) <= 60),
   author uuid default auth.uid() references public.mj_accounts (id) on delete set null,
   data jsonb not null default '{}'::jsonb,
@@ -299,11 +308,12 @@ create table if not exists public.mj_items (
 );
 alter table public.mj_items drop constraint if exists mj_items_kind_check;
 alter table public.mj_items add constraint mj_items_kind_check
-  check (kind in ('aviso', 'proposal', 'log', 'remind', 'featured', 'custom', 'ss', 'help', 'helpjoin'));
+  check (kind in ('aviso', 'proposal', 'log', 'remind', 'featured', 'custom', 'ss', 'help', 'helpjoin', 'pair'));
 alter table public.mj_items enable row level security;
 drop policy if exists "mj_items: leer" on public.mj_items;
 create policy "mj_items: leer" on public.mj_items for select to authenticated using (
   kind in ('aviso', 'featured', 'help', 'helpjoin')
+  or (kind = 'pair' and data ->> 'to' = auth.uid()::text)
   or (kind = 'custom' and (data ->> 'forStud' is null
       or exists (select 1 from public.mj_accounts k where k.id::text = data ->> 'forStud' and public.mj_can_see(k.id))))
   or public.mj_is_admin()
@@ -321,6 +331,8 @@ create policy "mj_items: crear" on public.mj_items for insert to authenticated w
     or (kind = 'help' and (public.mj_me()).role = 'maestro' and (public.mj_me()).status = 'approved')
     or (kind = 'helpjoin' and (public.mj_me()).role = 'alumno'
         and id = left((data ->> 'opp') || ':' || auth.uid()::text, 60) and public.mj_help_room(data ->> 'opp'))
+    -- reto en pareja: invitación a un compañero del mismo salón
+    or (kind = 'pair' and public.mj_same_salon(data ->> 'to'))
     -- proyecto de servicio social del alumno de Prepa (uno por alumno)
     or (kind = 'ss' and id = auth.uid()::text and (public.mj_me()).role = 'alumno' and (public.mj_me()).sec = 'Prepa'
         and data ->> 'status' = 'pending')
