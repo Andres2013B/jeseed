@@ -313,7 +313,7 @@ grant execute on function public.mj_help_room(text) to authenticated;
 -- ---------------------------------------------------------- Avisos, propuestas, registro, destacados, retos nuevos
 -- kind: aviso | proposal | log | remind | featured | custom
 create table if not exists public.mj_items (
-  kind text not null check (kind in ('aviso', 'proposal', 'log', 'remind', 'featured', 'custom', 'ss', 'help', 'helpjoin', 'pair')),
+  kind text not null,
   id text not null check (char_length(id) <= 60),
   author uuid default auth.uid() references public.mj_accounts (id) on delete set null,
   data jsonb not null default '{}'::jsonb,
@@ -322,7 +322,7 @@ create table if not exists public.mj_items (
 );
 alter table public.mj_items drop constraint if exists mj_items_kind_check;
 alter table public.mj_items add constraint mj_items_kind_check
-  check (kind in ('aviso', 'proposal', 'log', 'remind', 'featured', 'custom', 'ss', 'help', 'helpjoin', 'pair'));
+  check (kind in ('aviso', 'proposal', 'log', 'remind', 'featured', 'custom', 'ss', 'help', 'helpjoin', 'pair', 'feedback'));
 alter table public.mj_items enable row level security;
 drop policy if exists "mj_items: leer" on public.mj_items;
 create policy "mj_items: leer" on public.mj_items for select to authenticated using (
@@ -352,6 +352,10 @@ create policy "mj_items: crear" on public.mj_items for insert to authenticated w
     or (kind = 'ss' and id = auth.uid()::text and (public.mj_me()).role = 'alumno' and (public.mj_me()).sec = 'Prepa'
         and data ->> 'status' = 'pending')
     or (kind = 'proposal' and (public.mj_me()).role in ('alumno', 'maestro') and coalesce(data ->> 'status', 'pending') = 'pending')
+    -- sugerencias («¿Cómo podemos mejorar?»): una al día por persona; solo las lee coordinación
+    or (kind = 'feedback' and (public.mj_me()).status = 'approved'
+        and id = 'fb:' || auth.uid()::text || ':' || to_char(now() at time zone 'America/Mexico_City', 'YYYY-MM-DD')
+        and char_length(coalesce(data ->> 'text', '')) between 5 and 600)
     or (kind in ('aviso', 'remind') and (public.mj_me()).role = 'maestro' and (public.mj_me()).status = 'approved'
         and (kind = 'remind' or (data ->> 'to' = (public.mj_me()).grp and data ->> 'sec' = (public.mj_me()).sec)))
   ));
@@ -536,3 +540,22 @@ alter table public.mj_settings add constraint mj_settings_size check (pg_column_
 -- Nombres y salones sin signos de código (< >)
 alter table public.mj_accounts drop constraint if exists mj_accounts_safe_text;
 alter table public.mj_accounts add constraint mj_accounts_safe_text check (name !~ '[<>]' and coalesce(grp, '') !~ '[<>"''&]') not valid;
+
+-- ---------------------------------------------------------- Perfil: nombre y foto
+-- La foto (256 px) solo la ven la persona, su familia, su maestro y coordinación (la misma regla que la cuenta).
+alter table public.mj_accounts add column if not exists avatar text;
+alter table public.mj_accounts drop constraint if exists mj_accounts_avatar_ok;
+alter table public.mj_accounts add constraint mj_accounts_avatar_ok check (avatar is null or (char_length(avatar) <= 150000
+  and avatar ~ '^data:image/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$'));
+-- Cada quien cambia solo su nombre y su foto (nunca su rol, sección o salón)
+create or replace function public.mj_set_profile(p_name text, p_avatar text) returns public.mj_accounts
+language plpgsql security definer set search_path = public as $$
+declare me public.mj_accounts := public.mj_me(); nm text := regexp_replace(trim(coalesce(p_name, '')), '\s+', ' ', 'g');
+begin
+  if me.id is null then raise exception 'Primero entra con tu cuenta.'; end if;
+  if char_length(nm) < 2 or char_length(nm) > 40 or nm ~ '[<>]' then raise exception 'Escribe un nombre de 2 a 40 letras.'; end if;
+  if me.role in ('alumno', 'familia') and nm ~* 'coordinaci|administra|maestr[oa] ' then raise exception 'Ese nombre no está permitido.'; end if;
+  update public.mj_accounts set name = nm, avatar = nullif(p_avatar, '') where id = me.id returning * into me;
+  return me;
+end $$;
+grant execute on function public.mj_set_profile(text, text) to authenticated;

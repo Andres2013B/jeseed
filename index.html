@@ -437,6 +437,51 @@ body.tv #tvroot{display:block}
 .tvexit{position:fixed;right:16px;top:16px;z-index:9;background:#22305E;color:#FFF3DE;border:none;border-radius:14px;padding:10px 16px;font-weight:800;cursor:pointer;min-height:44px}
 .tvwrap .tank{border:4px solid #FFF3DE;background:#17224A;--ink:#FFF3DE;--surface:#0F1630}
 body.tv #demobar{margin-left:0!important}
+/* ---------- Diseño estilo Nathan ---------- */
+.pf-photo{display:flex;align-items:center;gap:16px}
+.sheet>.more-list,.sheet>.faq,.sheet>.me-card,.sheet>section,.sheet>nav,.sheet>form{flex-shrink:0}
+.faq{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:18px;overflow:hidden;background:var(--surface)}
+.faq details{border-bottom:1px solid var(--line)}.faq details:last-child{border-bottom:0}
+.faq summary{cursor:pointer;padding:14px 16px;font-weight:700;list-style:none;display:flex;justify-content:space-between;gap:10px}
+.faq summary::after{content:'+';color:var(--primary);font-weight:800}.faq details[open] summary::after{content:'–'}
+.faq summary::-webkit-details-marker{display:none}.faq p{margin:0;padding:0 16px 14px;color:var(--muted)}
+.laterrow{display:flex;align-items:center;gap:8px;flex-wrap:wrap;border:1px solid var(--line);border-radius:16px;padding:10px 12px;background:var(--surface)}
+.laterrow b{display:block}.laterrow small{color:var(--muted);font-size:12.5px}
+.fbrow{display:flex;gap:10px;align-items:flex-start;border-top:1px solid var(--line);padding-top:8px}
+.greetrow{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.greet{display:flex;flex-direction:column;gap:2px;min-width:0}
+.greet .eyebrow{font-size:10.5px;letter-spacing:.16em;color:var(--muted);font-weight:700}
+.greet h1{font-family:var(--font-h);font-size:clamp(28px,6vw,36px);font-weight:800;letter-spacing:-.03em;margin:0;line-height:1.05}
+.greet-sub{color:var(--muted);font-size:14px}
+.greet-st{display:flex;gap:8px}
+.hero-act{position:relative;overflow:hidden;display:flex;align-items:center;gap:18px;background:var(--primary);color:#fff;border-radius:28px;padding:26px 22px;isolation:isolate}
+.hero-act::before{content:'';position:absolute;right:-60px;top:50%;width:300px;height:300px;transform:translateY(-50%);border-radius:50%;border:1px solid rgba(255,255,255,.18);box-shadow:0 0 0 34px rgba(255,255,255,.04);z-index:-1}
+.ha-tx{flex:1;min-width:0;display:flex;flex-direction:column;gap:10px}
+.hero-act .eyebrow{color:rgba(255,255,255,.75);font-size:10.5px;letter-spacing:.16em;font-weight:700}
+.hero-act h2{font-family:var(--font-h);font-size:clamp(28px,6.4vw,46px);line-height:1.02;letter-spacing:-.035em;margin:0;color:#fff;font-weight:800}
+.hero-act p{margin:0;color:rgba(255,255,255,.85);font-size:15px;max-width:34ch}
+.ha-b{display:flex;gap:10px;flex-wrap:wrap;margin-top:6px}
+.btn.lime{background:var(--lime);color:#23182F;box-shadow:none}.btn.lime:hover{filter:brightness(1.05)}
+.btn.on-dark{background:transparent;color:#fff;border-color:rgba(255,255,255,.5)}
+.hero-flower{flex:none;filter:drop-shadow(0 8px 18px rgba(0,0,0,.18))}
+@media (max-width:520px){.hero-act{padding:22px 18px}.hero-flower{width:96px;height:96px;position:absolute;right:-14px;top:44%;opacity:.95}.ha-tx{padding-right:62px}.hero-act p{font-size:14px}}
+.av{display:inline-grid;place-items:center;border-radius:50%;background:var(--lav);color:var(--primary);font-weight:800;font-family:var(--font-h);overflow:hidden;flex:none;border:1px solid color-mix(in srgb,var(--primary) 18%,var(--line))}
+.av img{width:100%;height:100%;object-fit:cover;display:block}
+.tb-me .av{width:26px!important;height:26px!important;font-size:11px!important}
+.tb-me.on .av{box-shadow:0 0 0 2px var(--primary)}
+.sn-prof{margin-top:10px;border:1px solid var(--line)!important;background:var(--surface)!important;padding:10px 12px!important}
+.sn-prof>span:last-child{display:flex;flex-direction:column;min-width:0}.sn-prof b{color:var(--ink);font-size:14px}.sn-prof small{font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sn-prof.on{border-color:var(--primary)!important}
+.pg-title{font-family:var(--font-h);font-size:32px;letter-spacing:-.03em;margin:0}
+.me-card{display:flex;align-items:center;gap:14px;flex-wrap:wrap}.me-card h3{margin:0;font-size:22px;font-family:var(--font-h)}
+.bell .bl,.rolebtn .rl{font-size:13.5px;font-weight:700}
+.bell{width:auto!important;padding:0 14px;gap:6px;display:inline-flex!important;align-items:center;border-radius:14px!important;border-width:1px!important;min-height:42px;height:42px}
+.bell>i{position:static!important;margin-left:2px}
+.rolebtn{border-radius:14px!important;min-height:42px}
+.bell[hidden]{display:none!important}
+@media (max-width:1179px){body.tb-on #bagbtn{display:none!important}}
+@media (max-width:480px){.bell .bl,.rolebtn .rl{display:none}.bell,.rolebtn{padding:0 11px!important;width:42px!important;justify-content:center}.bell>i{position:absolute!important;top:-5px;right:-5px}}
+.sn-prof .av{flex:none!important;width:40px!important;height:40px!important}
 .mfa-in{font-size:26px;letter-spacing:8px;text-align:center;font-variant-numeric:tabular-nums}
 .mfa-qr{width:200px;height:200px;align-self:center;background:#fff;border-radius:14px;padding:8px}
 .mfa-secret{display:block;word-break:break-all;background:var(--lav);padding:10px;border-radius:10px;margin-top:6px;font-size:14px}
@@ -782,11 +827,9 @@ body.kinder .btn.mic,.kidmic .btn.mic{font-size:17px;padding:14px 18px}
 <header class="brandbar"><img class="bb-logo" src="logo.png" width="40" height="40" alt=""><span><small>COLEGIO OLAMI ORT</small>maayan jésed</span><span class="bb-r"><button class="bell bagbtn" id="bagbtn" data-act="bag" aria-label="Mi bolsa"></button><button class="bell" id="bell" data-act="notifs" aria-label="Notificaciones"></button><button class="rolebtn" id="rolebtn" data-act="roles"></button></span></header>
 <div class="app" id="app">
  <div id="student" class="stack14">
-  <div class="row" style="gap:8px">
-    <div class="me" id="me"></div>
-  </div>
-  <div class="hero2" id="hero2"></div>
+  <div class="me greetrow" id="me"></div>
   <div id="owncta"></div>
+  <div class="hero2" id="hero2"></div>
   <div id="pairbox"></div>
   <div id="helpcard"></div>
   <div id="cerbox"></div>
@@ -821,7 +864,7 @@ body.kinder .btn.mic,.kidmic .btn.mic{font-size:17px;padding:14px 18px}
 <div id="layer"></div>
 
 <script src="vendor/supabase-js@2.45.4.js"></script>
-<script src="app.js?v=1"></script>
+<script src="app.js?v=2"></script>
 
 </body>
 </html>
