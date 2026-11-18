@@ -42,9 +42,19 @@ language sql stable security definer set search_path = public as $$
   select * from public.mj_accounts where id = auth.uid();
 $$;
 
+-- Verificación en dos pasos: si la cuenta activó un autenticador, la sesión debe haber
+-- confirmado el código (aal2). Sin eso, coordinación no tiene ningún permiso especial.
+create or replace function public.mj_aal_ok() returns boolean
+language sql stable security definer set search_path = public, auth as $$
+  select coalesce(auth.jwt() ->> 'aal', 'aal1') = 'aal2'
+      or not exists (select 1 from auth.mfa_factors f where f.user_id = auth.uid() and f.status = 'verified');
+$$;
+grant execute on function public.mj_aal_ok() to authenticated;
+
 create or replace function public.mj_is_admin() returns boolean
 language sql stable security definer set search_path = public as $$
-  select public.is_moderator() or exists (select 1 from public.mj_accounts where id = auth.uid() and role = 'admin');
+  select (public.is_moderator() or exists (select 1 from public.mj_accounts where id = auth.uid() and role = 'admin'))
+     and public.mj_aal_ok();
 $$;
 
 -- ¿Puedo ver los datos de este alumno? (yo, mi familia, mi maestro o coordinación)
@@ -133,7 +143,7 @@ grant execute on function public.mj_can_log(uuid) to authenticated;
 
 drop policy if exists "mj_subs: enviar" on public.mj_subs;
 create policy "mj_subs: enviar" on public.mj_subs for insert to authenticated
-  with check ((owner = auth.uid() and exists (select 1 from public.mj_accounts where id = auth.uid() and role = 'alumno'))
+  with check ((owner = auth.uid() and exists (select 1 from public.mj_accounts where id = auth.uid() and role = 'alumno' and status = 'approved'))
               or public.mj_can_log(owner));
 drop policy if exists "mj_subs: cambiar" on public.mj_subs;
 create policy "mj_subs: cambiar" on public.mj_subs for update to authenticated
@@ -250,6 +260,8 @@ grant execute on function public.mj_ss_ok() to authenticated;
 drop policy if exists "mj_hours: registrar" on public.mj_hours;
 create policy "mj_hours: registrar" on public.mj_hours for insert to authenticated
   with check (owner = auth.uid() and status = 'pending' and (data ->> 'photo') is not null
+              and (data ->> 'photo') ~ '^data:image/(jpeg|jpg|png|webp);base64,[A-Za-z0-9+/=]+$'
+              and pg_column_size(data) <= 900000
               and exists (select 1 from public.mj_accounts where id = auth.uid() and role = 'alumno')
               and public.mj_ss_ok());
 drop policy if exists "mj_hours: confirmar" on public.mj_hours;
@@ -325,7 +337,7 @@ drop policy if exists "mj_items: crear" on public.mj_items;
 create policy "mj_items: crear" on public.mj_items for insert to authenticated with check (
   author = auth.uid() and (
     public.mj_is_admin()
-    or kind = 'log'
+    or (kind = 'log' and (public.mj_me()).role in ('maestro', 'familia'))
     -- la familia propone retos solo para su hijo o hija; coordinación los autoriza
     or (kind = 'proposal' and (public.mj_me()).role = 'familia' and (public.mj_me()).child is not null
         and data ->> 'forStud' = (public.mj_me()).child::text and coalesce(data ->> 'status', 'pending') = 'pending')
@@ -334,7 +346,8 @@ create policy "mj_items: crear" on public.mj_items for insert to authenticated w
     or (kind = 'helpjoin' and (public.mj_me()).role = 'alumno'
         and id = left((data ->> 'opp') || ':' || auth.uid()::text, 60) and public.mj_help_room(data ->> 'opp'))
     -- reto en pareja: invitación a un compañero del mismo salón
-    or (kind = 'pair' and public.mj_same_salon(data ->> 'to'))
+    or (kind = 'pair' and public.mj_same_salon(data ->> 'to') and data ->> 'from' = auth.uid()::text
+        and data ->> 'fromName' = (public.mj_me()).name)
     -- proyecto de servicio social del alumno de Prepa (uno por alumno)
     or (kind = 'ss' and id = auth.uid()::text and (public.mj_me()).role = 'alumno' and (public.mj_me()).sec = 'Prepa'
         and data ->> 'status' = 'pending')
@@ -505,3 +518,21 @@ language sql stable security definer set search_path = public as $$
   group by x;
 $$;
 grant execute on function public.mj_like_counts() to authenticated;
+
+-- ---------------------------------------------------------- SEGURIDAD
+-- Límites de tamaño y de formato para que nadie meta datos enormes o código escondido.
+-- (not valid: no revisa lo que ya estaba guardado, solo lo nuevo)
+alter table public.mj_subs drop constraint if exists mj_subs_photo_ok;
+alter table public.mj_subs add constraint mj_subs_photo_ok check (photo is null or (char_length(photo) <= 900000
+  and photo ~ '^data:image/(jpeg|jpg|png|webp);base64,[A-Za-z0-9+/=]+$')) not valid;
+alter table public.mj_subs drop constraint if exists mj_subs_data_size;
+alter table public.mj_subs add constraint mj_subs_data_size check (pg_column_size(data) <= 30000) not valid;
+alter table public.mj_items drop constraint if exists mj_items_data_size;
+alter table public.mj_items add constraint mj_items_data_size check (pg_column_size(data) <= 900000) not valid;
+alter table public.mj_studs drop constraint if exists mj_studs_data_size;
+alter table public.mj_studs add constraint mj_studs_data_size check (pg_column_size(data) <= 300000) not valid;
+alter table public.mj_settings drop constraint if exists mj_settings_size;
+alter table public.mj_settings add constraint mj_settings_size check (pg_column_size(value) <= 2000000) not valid;
+-- Nombres y salones sin signos de código (< >)
+alter table public.mj_accounts drop constraint if exists mj_accounts_safe_text;
+alter table public.mj_accounts add constraint mj_accounts_safe_text check (name !~ '[<>]' and coalesce(grp, '') !~ '[<>"''&]') not valid;
